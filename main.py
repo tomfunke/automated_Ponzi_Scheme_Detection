@@ -3,56 +3,54 @@ import os
 import pandas as pd
 import pm_discovery
 import preprocess_and_convert_to_ocel
+import sys
+import helper
 
 def main():
     """
     Input is
-    (1)Filepath and a 
-    (2)boolean if the CSV is a call or event dapp and the 
+    (1)directory path, and a 
+    (2)contract_address with their range as name, and the 
     (3)object selection
     """
-    # Path to your OCEL log file (JSON or XML format)
-    input_file_path = "/Users/tomfunke/Desktop/Detector/testset/df_call_dapp_with_ether_transfer_0x5acc84a3e955bdd76467d3348077d003f00ffb97_9315825_9454321forsage.pkl"
-    #call_dapp forsage "/Users/tomfunke/Desktop/Detector/testset/df_call_dapp_with_ether_transfer_0x5acc84a3e955bdd76467d3348077d003f00ffb97_9391396_9393000forsage.csv"
-    #3 try mit kitty"/Users/tomfunke/Desktop/Detector/testset/df_events_dapp_0x06012c8cf97bead5deae237070f9587f8e7a266d_4605167_4615167Kitty.csv"
-    #2 try mit million "/Users/tomfunke/Desktop/Detector/testset/df_events_dapp_0xbcf935d206ca32929e1b887a07ed240f0d8ccd22_8447267_8458000million.csv"
-    #1 try mit forsage'/Users/tomfunke/Desktop/Detector/testset/df_events_dapp_0x5acc84a3e955bdd76467d3348077d003f00ffb97_9391396_9393000Forsage.csv'
-    #direct paths to test
-    direct_path_to_example = '/Users/tomfunke/Desktop/Detector/testset/example_log.csv'
-    direct_path_to_preprocessed = '/Users/tomfunke/Desktop/Detector/testset/df_events_dapp_0x5acc84a3e955bdd76467d3348077d003f00ffb97_9391396_9393000_preprocessed.csv'
-
-    #Bool Input which kind of file: events_dapp == true or call_dapp == false
-    is_events_dapp = False
+    # Path to log folder
+    input_file_path = "/Users/tomfunke/Desktop/logging/locale_extraktion/etherDoubler"
+    #"/Users/tomfunke/Desktop/logging/locale_extraktion/forsage_120k_60k_ab_creation"
+    #"/Users/tomfunke/Desktop/logging/locale_extraktion/millionmoney_200k"
+    
+    # Just the name without the prefix and suffix
+    input_contract_file_name = "0xfd2487cc0e5dce97f08be1bc8ef1dce8d5988b4d_1014288_12679208"
+    #"0x5acc84a3e955bdd76467d3348077d003f00ffb97_9315825_9454321"
+    #"0xbcf935d206ca32929e1b887a07ed240f0d8ccd22_8447267_8654321"
+    
 
     # Object selection
+    # TODO: Noch zutreffend bei unterdschiedlichen files?
     object_selection = ["from"]
 
     """
-    Slice name out of the path
-    """
-    # Slice the name out of the path
-    filename = os.path.basename(input_file_path)
-    filename_without_extension = os.path.splitext(filename)[0]
-    format_type = os.path.splitext(filename)[1]
-
-
+    Pathing
+    """   
+    trace_tree_path = os.path.join(input_file_path,'df_trace_tree_' + input_contract_file_name)
+    events_dapp__path = os.path.join(input_file_path,'df_events_dapp_' + input_contract_file_name)
+    value_calls_dapp_path = os.path.join(input_file_path,'df_call_dapp_with_ether_transfer_' + input_contract_file_name)
+    zero_value_calls_dapp_path = os.path.join(input_file_path,'df_call_dapp_with_no_ether_transfer_' + input_contract_file_name)
+    delegatecall_dapp_path = os.path.join(input_file_path,'df_delegatecall_dapp_' + input_contract_file_name)
+    format_type_trace_tree = helper.check_file_exists(trace_tree_path)
+    
     """
     Here begins the main function
     """
-
+    output = preprocess_and_convert_to_ocel.preprocess(format_type_trace_tree, trace_tree_path,events_dapp__path, value_calls_dapp_path, zero_value_calls_dapp_path, delegatecall_dapp_path)
     # Preprocess the CSV and get the OCEL object: https://pm4py.fit.fraunhofer.de/static/assets/api/2.7.8/pm4py.objects.ocel.html#pm4py.objects.ocel.obj.OCEL
-    #chooses one of the functions based on the boolean based on the input file
-    # select which coloumn is the object
-    if is_events_dapp:
-        ocel = preprocess_and_convert_to_ocel.convert_events_dapp_to_ocel(format_type, input_file_path, object_selection)
-    else:
-        ocel = preprocess_and_convert_to_ocel.convert_call_dapp_to_ocel(format_type, input_file_path, object_selection)
-
+    #events_ocel = preprocess_and_convert_to_ocel.convert_events_dapp_to_ocel(format_type, input_file_path, object_selection)
+    #Calls_ocel = preprocess_and_convert_to_ocel.convert_call_dapp_to_ocel(format_type, input_file_path, object_selection)
+    """
     # Discover the Object-Centric Petri Net (OC-PN) and Object-Centric Directly-Follows Graph (OC-DFG)
     #ocel is the input object
     #filename_without_extension is for saving the output
-    pm_discovery.pn_and_dfg_discovery(ocel, filename_without_extension)
-    
+    pm_discovery.pn_and_dfg_discovery(ocel, input_contract_address_with_range)
+    """
 
 if __name__ == "__main__":
     main()

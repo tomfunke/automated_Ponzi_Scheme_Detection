@@ -8,15 +8,25 @@ def convert_df_coloumns(df):
     df.rename(columns={"timeStamp": "time:timestamp"}, inplace=True)
     df["time:timestamp"] = pd.to_datetime(df["time:timestamp"], dayfirst=False)
 
-    # Directly rename the first column to 'ocel:eid'
-    # Assuming the first column is the one without a name -> NUR IN CSV! Aber eigentlich nicht notwendig, die spalte?
-    #df.columns.values[0] = 'ocel:eid'
+    # Remove unnecessary columns if present
+        # functionName is a legacy column that is no longer used in the logger
+    if "Unnamed: 0" in df.columns.values.tolist():
+        df.drop(["Unnamed: 0"], inplace=True, axis=1)
+    if "functionName" in df.columns.values.tolist():
+        df.drop(["functionName"], inplace=True, axis=1)
 
     return df
 
-def safe_preprocessed_file(df, file_path, format_type):
+def save_preprocessed_file(df, file_path, format_type):
     # Save the preprocessed DataFrame to a new File
-    preprocessed_path = file_path.replace(format_type, f'_preprocessed{format_type}')
+
+    # Construct the new file path based on the presence of the format_type in the original file path
+    if format_type in file_path:
+        preprocessed_path = file_path.replace(format_type, f'_preprocessed{format_type}')
+    else:
+        preprocessed_path = file_path + f'_preprocessed{format_type}'
+    
+    # Save the DataFrame to the appropriate file format
     if format_type == ".csv":
         df.to_csv(preprocessed_path, index=False)
     elif format_type == ".pkl":
@@ -25,14 +35,38 @@ def safe_preprocessed_file(df, file_path, format_type):
 def read_input_file(input_csv_file_path, format_type):
     # Read the CSV or pickle file into a pandas DataFrame
     if format_type == ".csv":
-        df = pd.read_csv(input_csv_file_path)
+        df = pd.read_csv(input_csv_file_path+format_type, low_memory=False)
     elif format_type == ".pkl":
-        df = pd.read_pickle(input_csv_file_path) #for pickle files
+        df = pd.read_pickle(input_csv_file_path+format_type) #for pickle files
     else:
         raise ValueError("The input file format is not supported")
     
     return df
+
+def revert_txs(df):
+    # This error DataFrame includes only the columns "error" and "hash", which are essential for identifying errors associated with transaction hashes.
+    errors = df[['error', 'hash']]
+    errors.reset_index(inplace=True, drop=True)
+
+    # Creates a boolean mask, mask_reverted, that identifies rows in the DataFrame where the "error" column contains specific error messages associated with transaction reversion. 
+    mask_reverted = errors["error"].isin([
+        'out of gas', 
+        'invalid jump destination',
+        'execution reverted',
+        'write protection',
+        'invalid opcode: INVALID',
+        'contract creation code storage out of gas'
+        ])
+    # Uses this mask to extract the unique transaction hashes ("hash") associated with these errors, storing them in a set called txs_reverted
+    txs_reverted = set(errors[mask_reverted]["hash"])
     
+    # Create a mask for transactions that are NOT reverted
+    mask_not_reverted = ~df["hash"].isin(list(txs_reverted))
+    
+    # Use the mask to filter the DataFrame, keeping only rows where the transaction hash is not in txs_reverted
+    df = df[mask_not_reverted]
+
+    return df
 
 def convert_events_dapp_to_ocel(format_type, file_path, object_selection):
     df = read_input_file(file_path, format_type)
@@ -44,10 +78,10 @@ def convert_events_dapp_to_ocel(format_type, file_path, object_selection):
     #example_objects = ["user"] # either choose objective via Input here or its always coloumn 9! (user/owner)
     #remaining_attributes = ["address", "tracePos", "tracePosDepth", "hash", "blocknumber"] + additional_columns
     
-    #converts the dataframe to ocel format with the given object types
+    #converts the dataframe to ocel format with the given object types: https://pm4py.fit.fraunhofer.de/static/assets/api/2.7.8/generated/pm4py.convert.convert_log_to_ocel.html
     ocel = pm4py.convert_log_to_ocel(df, object_types=object_selection, additional_event_attributes = remaining_attributes)
 
-    safe_preprocessed_file(df, file_path, format_type)
+    save_preprocessed_file(df, file_path, format_type)
     
     return ocel
 
@@ -55,12 +89,13 @@ def convert_call_dapp_to_ocel(format_type, file_path, object_selection):
     df = read_input_file(file_path, format_type)
     # Remove rows where 'name' is None or ''
     # This is necessary because the OCEL importer does not accept empty activity names: so effectively, we are removing every Error like out of gas
-    df = df[df['name'].notna() & (df['name'] != '')]
+    #df = df[df['name'].notna() & (df['name'] != '')]
 
-    #TODO: Kick noch Zeilen mit gleichen Hash, da mehrmals die Zeile da ist bei call_dapp. denn die leeren zuvor gefilterteten, sind die mit einem error,
-    # welche in der nächsten zeile auch noch gekickt werden müssen
+    # Deletes all rows where their hash is acosiated with an error
+    df = revert_txs(df)
 
-    convert_df_coloumns(df)
+    
+    df = convert_df_coloumns(df)
 
     # Creates a list of all columns that are additional for the OCEL as event attributes: All Coloumns minus the chosen object minus the standard columns time and activity
     remaining_attributes = np.setdiff1d(df.columns.to_numpy(), np.array(['concept:name', 'time:timestamp']+object_selection))
@@ -68,9 +103,89 @@ def convert_call_dapp_to_ocel(format_type, file_path, object_selection):
     #remaining_attributes = ["address", "tracePos", "tracePosDepth", "hash", "blocknumber", "to", "callvalue", "input", "output", "gas", "gasUsed", "functionName", "error", "calltype"] # hier fehlen noch spalten
     
     #converts the dataframe to ocel format with the given object types
-    ocel = pm4py.convert_log_to_ocel(df, object_types=object_selection, additional_event_attributes = remaining_attributes)
+    #ocel = pm4py.convert_log_to_ocel(df, object_types=object_selection, additional_event_attributes = remaining_attributes)
 
-    safe_preprocessed_file(df, file_path, format_type)
+    save_preprocessed_file(df, file_path, format_type)
     
-    return ocel
+    #return ocel
+
+def create_a_set_of_error_txs(df):
+    # This error DataFrame includes only the columns "error" and "hash", which are essential for identifying errors associated with transaction hashes.
+    errors = df[['error', 'hash']]
+    errors.reset_index(inplace=True, drop=True)
+
+    # Creates a boolean mask, mask_reverted, that identifies rows in the DataFrame where the "error" column contains specific error messages associated with transaction reversion. 
+    mask_reverted = errors["error"].isin([
+        'out of gas', 
+        'invalid jump destination',
+        'execution reverted',
+        'write protection',
+        'invalid opcode: INVALID',
+        'contract creation code storage out of gas'
+        ])
+    # Uses this mask to extract the unique transaction hashes ("hash") associated with these errors, storing them in a set called txs_reverted
+    txs_hashes = set(errors[mask_reverted]["hash"])
+
+    return txs_hashes
+
+def filter_txs_with_errors(df, txs_hashes):
+    # Create a mask for transactions that are NOT reverted
+    mask_not_reverted = ~df["hash"].isin(list(txs_hashes))
     
+    # Use the mask to filter the DataFrame, keeping only rows where the transaction hash is not in txs_reverted
+    df = df[mask_not_reverted]
+
+    return df
+
+def preprocess(format_type, trace_tree_path, events_dapp__path, value_calls_dapp_path, zero_value_calls_dapp_path, delegatecall_dapp_path):
+    """
+    Filters errors
+
+    Args:
+        trace_tree_path (path): bla
+        dict_abi (dict): blaaa
+
+    Raises:
+        ValueError: 
+
+    Returns:
+        pd.DataFrame: A DataFrame with 
+
+    Overview:
+        The function first 
+    """
+    ##### TRACE TREE #####
+    # just for finding the error txs
+    # Read the input tracetree file
+    tracetree = read_input_file(trace_tree_path, format_type)
+    
+    # create a set of all transactions that are associated with an error
+    set_of_txs_to_revert = create_a_set_of_error_txs(tracetree)
+    
+    # memory management
+    del tracetree
+
+    # Liste von Tupeln, jedes Tupel enthält den Pfad und den Namen der Datei
+    dapp_list = [(events_dapp__path, "EVENTS DAPP"),
+                 (value_calls_dapp_path, "VALUE CALLS"), 
+                 (zero_value_calls_dapp_path, "ZERO VALUE CALLS"), 
+                 (delegatecall_dapp_path, "DELEGATECALL")]
+    # Dictionary to hold each DataFrame
+    dataframes = {}
+
+    for dapp_path, dapp_name in dapp_list:
+        dapp_df = read_input_file(dapp_path, format_type)
+
+        # Überprüfen, ob der DataFrame leer ist oder nur Nullwerte enthält
+        if dapp_df.empty or (dapp_df == 0).all().all():
+            print(f"Skipping {dapp_name} processing as the DataFrame is empty or contains only zero values.")
+            #flag dataframe as empty
+            dataframes[dapp_name] = None
+        else:
+            dapp_df = filter_txs_with_errors(dapp_df, set_of_txs_to_revert)
+            dapp_df = convert_df_coloumns(dapp_df)
+            save_preprocessed_file(dapp_df, dapp_path, format_type)
+            dataframes[dapp_name] = dapp_df
+    
+    print(dataframes["VALUE CALLS"])
+    #can use the dataframes here within in dictionary

@@ -1,6 +1,7 @@
 import pm4py
 import pandas as pd
 import numpy as np
+import os
 
 def convert_df_coloumns(df):
     # Rename the columns to match the OCEL standard
@@ -44,6 +45,9 @@ def read_input_file(input_csv_file_path, format_type):
     return df
 
 def revert_txs(df):
+    """
+    Leagacy
+    """
     # This error DataFrame includes only the columns "error" and "hash", which are essential for identifying errors associated with transaction hashes.
     errors = df[['error', 'hash']]
     errors.reset_index(inplace=True, drop=True)
@@ -137,9 +141,16 @@ def filter_txs_with_errors(df, txs_hashes):
 
     return df
 
-def preprocess(format_type, trace_tree_path, events_dapp__path, value_calls_dapp_path, zero_value_calls_dapp_path, delegatecall_dapp_path):
+def rename_activities_in_calls(value_calls_df):
+    # empty values in the column "concept:name"
+    mask = (value_calls_df["concept:name"].isna()) & (value_calls_df["calltype"] == "CALL")
+    value_calls_df.loc[mask, "concept:name"] = "call and transfer ether"
+    
+    return value_calls_df
+
+def preprocess(format_type, trace_tree_path, events_dapp__path, value_calls_dapp_path, zero_value_calls_dapp_path, delegatecall_dapp_path, value_calls_non_dapp_path, folder_path,contract_file_name):
     """
-    Filters errors
+    Filters errors & converts tables & saves them in a new file
 
     Args:
         trace_tree_path (path): bla
@@ -165,27 +176,56 @@ def preprocess(format_type, trace_tree_path, events_dapp__path, value_calls_dapp
     # memory management
     del tracetree
 
-    # Liste von Tupeln, jedes Tupel enthält den Pfad und den Namen der Datei
+    #### PREPROCESSING ####
+    #Create a list of tuples, each tuple containing the path and name of the file
+    # This is done to avoid code duplication
     dapp_list = [(events_dapp__path, "EVENTS DAPP"),
                  (value_calls_dapp_path, "VALUE CALLS"), 
                  (zero_value_calls_dapp_path, "ZERO VALUE CALLS"), 
-                 (delegatecall_dapp_path, "DELEGATECALL")]
+                 (delegatecall_dapp_path, "DELEGATECALL"),
+                 (value_calls_non_dapp_path, "VALUE CALLS NON DAPP")
+                 ]
     # Dictionary to hold each DataFrame
     dataframes = {}
 
+    # Iterate over each file to preprocess
     for dapp_path, dapp_name in dapp_list:
         dapp_df = read_input_file(dapp_path, format_type)
 
-        # Überprüfen, ob der DataFrame leer ist oder nur Nullwerte enthält
+        # Check if the DataFrame is empty or contains only zero values
         if dapp_df.empty or (dapp_df == 0).all().all():
-            print(f"Skipping {dapp_name} processing as the DataFrame is empty or contains only zero values.")
-            #flag dataframe as empty
+            #print(f"Skipping {dapp_name} processing as the DataFrame is empty or contains only zero values.")
+            # flag dataframe as empty/ None
             dataframes[dapp_name] = None
         else:
+            #### Actual Preprocessing here ####
             dapp_df = filter_txs_with_errors(dapp_df, set_of_txs_to_revert)
             dapp_df = convert_df_coloumns(dapp_df)
+            
+            # Rename activities in Calls (every file except EVENTS DAPP)
+            if dapp_name != "EVENTS DAPP":
+                dapp_df = rename_activities_in_calls(dapp_df)
+            
             save_preprocessed_file(dapp_df, dapp_path, format_type)
+
+            #store each DataFrame with a specific variable name dynamically after processing, for further data handling
             dataframes[dapp_name] = dapp_df
     
-    print(dataframes["VALUE CALLS"])
+    
     #can use the dataframes here within in dictionary
+    #events_dapp_df = dataframes["EVENTS DAPP"]
+    #if dataframes["ZERO VALUE CALLS"] is not None    
+    
+    
+    # combines all dataframes in the dictionary dataframes if they are not None /empty
+    combined_df = pd.concat([df for df in dataframes.values() if df is not None])
+
+    # sort by timestamp (timestamp of the block), transaction index (order in block) and trace position (order in transaction)
+    # TODO: implement tracePosDepth statt tracePos für Baumstruktur
+    combined_df = combined_df.sort_values(["time:timestamp", "transactionIndex", "tracePos"])
+
+    save_preprocessed_file(combined_df, os.path.join(folder_path,'df_combinded_' + contract_file_name), format_type)
+
+    # TODO objects implementieren; dann ocel erstellen
+
+    print("preprocess done")

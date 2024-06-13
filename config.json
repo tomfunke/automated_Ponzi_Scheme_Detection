@@ -1,0 +1,7 @@
+{
+    "port": 8547,
+    "protocol": "http://",
+    "host": "127.0.0.1",
+    "input_folder_path" : "/Users/tomfunke/Desktop/logging/ServerKopie/resources_forsage_non_2",
+    "input_contract_file_name" : "0x5acc84a3e955bdd76467d3348077d003f00ffb97_9315825_9500321"
+}

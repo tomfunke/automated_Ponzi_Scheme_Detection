@@ -2,8 +2,8 @@
 This project uses process mining techniques to check if the ethereum blockchain application data is a Ponzi scheme
 
 ## prerequisites
-Ethereum Archive Node with a Geth-based client
-tabular transaction trace data from the extractor
+1. Ethereum Archive Node with a Geth-based client
+2. tabular transaction trace data from the extractor
 
 
 ## Installation

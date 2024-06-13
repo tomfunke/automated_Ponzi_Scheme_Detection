@@ -2,6 +2,7 @@ import pm4py
 import pandas as pd
 import numpy as np
 import os
+import etherenode
 
 def convert_df_coloumns(df):
     # Rename the columns to match the OCEL standard
@@ -73,6 +74,7 @@ def revert_txs(df):
     return df
 
 def convert_events_dapp_to_ocel(format_type, file_path, object_selection):
+    #legacy
     df = read_input_file(file_path, format_type)
     df = convert_df_coloumns(df)
 
@@ -90,6 +92,7 @@ def convert_events_dapp_to_ocel(format_type, file_path, object_selection):
     return ocel
 
 def convert_call_dapp_to_ocel(format_type, file_path, object_selection):
+    #legacy
     df = read_input_file(file_path, format_type)
     # Remove rows where 'name' is None or ''
     # This is necessary because the OCEL importer does not accept empty activity names: so effectively, we are removing every Error like out of gas
@@ -143,12 +146,39 @@ def filter_txs_with_errors(df, txs_hashes):
 
 def rename_activities_in_calls(value_calls_df):
     # empty values in the column "concept:name"
+    #TODO ist aber eigentlich nur bei bei den einfachen ponzis wie etheramid der Fall. bei augur stimmt das glaube nicht. siehe call dapp ether
     mask = (value_calls_df["concept:name"].isna()) & (value_calls_df["calltype"] == "CALL")
     value_calls_df.loc[mask, "concept:name"] = "call and transfer ether"
     
     return value_calls_df
 
-def preprocess(format_type, trace_tree_path, events_dapp__path, value_calls_dapp_path, zero_value_calls_dapp_path, delegatecall_dapp_path, value_calls_non_dapp_path, folder_path,contract_file_name):
+
+def get_address_type(addresses, node_url, folder_path):
+    list_address_type_file_path = os.path.join(folder_path, 'list_address_type.txt')
+
+    if os.path.exists(list_address_type_file_path):
+    # if file exists read file instead of connecting to the node
+        with open(list_address_type_file_path, 'r') as file:
+            address_dict = {}
+            for line in file:
+                key, value = line.strip().split(':', 1)
+                address_dict[key] = value
+        print("Successfully read the list_address_type from the file")
+        return address_dict
+    else:
+        # check if the addresses are smart contracts or externally owned accounts (EOAs) by connecting to the Ethereum node
+        set_of_addresses = set(addresses) # create a set of unique addresses for faster processing
+        address_dict = etherenode.check_addresses_for_address_type(set_of_addresses, node_url)
+        print("Successfully checked the address types with the Ethereum node")
+
+        # Save list_address_type as a file on your device for future use
+        with open(list_address_type_file_path, 'w') as file:
+            for key, value in address_dict.items():
+                file.write(f"{key}:{value}\n")
+        print("Successfully saved the list_address_type to a file")
+        return address_dict
+
+def preprocess(format_type, trace_tree_path, events_dapp__path, value_calls_dapp_path, zero_value_calls_dapp_path, delegatecall_dapp_path, value_calls_non_dapp_path, folder_path, contract_file_name, node_url):
     """
     Filters errors & converts tables & saves them in a new file
 
@@ -223,9 +253,19 @@ def preprocess(format_type, trace_tree_path, events_dapp__path, value_calls_dapp
     # sort by timestamp (timestamp of the block), transaction index (order in block) and trace position (order in transaction)
     # TODO: implement tracePosDepth statt tracePos für Baumstruktur
     combined_df = combined_df.sort_values(["time:timestamp", "transactionIndex", "tracePos"])
+    
+    # combine the "from" and "to" columns into a new column "Address_o" (object)
+    combined_df["Address_o"] = combined_df["to"].combine_first(combined_df["address"])
 
+    # adds a coloumn address_types to determine if the address is a smart contract or an externally owned account (EOA)
+    address_type_map = get_address_type(combined_df["Address_o"], node_url, folder_path)
+    combined_df["Address_Type"] = combined_df["Address_o"].map(address_type_map)
+    
     save_preprocessed_file(combined_df, os.path.join(folder_path,'df_combinded_' + contract_file_name), format_type)
-
-    # TODO objects implementieren; dann ocel erstellen
-
     print("preprocess done")
+
+    """
+    converts the dataframe to ocel format with the given object types
+    object_types is a list of strings that represent the columns in the dataframe that should be used as objects -> just the name of the coloumns
+    """
+    #ocel = pm4py.convert_log_to_ocel(df, object_types=object_selection, additional_event_attributes = remaining_attributes)

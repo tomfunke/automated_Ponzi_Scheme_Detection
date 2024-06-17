@@ -40,7 +40,7 @@ def main():
 
     Ensure you are connected to the Ethereum node and the node is running!
 
-    
+
     Output is
     """
     # Load the config file
@@ -49,7 +49,8 @@ def main():
     
     # Set the paths for faster testing:
     # Path to log folder
-    input_folder_path = "/Users/tomfunke/Desktop/logging/ServerKopie/resources_forsage_non_2"
+    input_folder_path = "/Users/tomfunke/Desktop/logging/locale_extraktion/inklusive_nondapp/forsage_50k_ohne45e"
+    #"/Users/tomfunke/Desktop/logging/ServerKopie/resources_forsage_non_2"
     #"/Users/tomfunke/Desktop/logging/locale_extraktion/inklusive_nondapp/etheramid"
     #"/Users/tomfunke/Desktop/logging/locale_extraktion/etherDoubler"
     #"/Users/tomfunke/Desktop/logging/locale_extraktion/forsage_120k_60k_ab_creation"
@@ -57,7 +58,8 @@ def main():
     
     # Just the name without the prefix and suffix (main contract_address with range withour file format)
     # example: "0x9758da9b4d001ed2d0df46d25069edf53750767a_1335983_1497934"
-    input_contract_file_name = "0x5acc84a3e955bdd76467d3348077d003f00ffb97_9315825_9500321"
+    input_contract_file_name = "0x5acc84a3e955bdd76467d3348077d003f00ffb97_9391396_9441396"
+    #"0x5acc84a3e955bdd76467d3348077d003f00ffb97_9315825_9500321"
     #"0x9758da9b4d001ed2d0df46d25069edf53750767a_1335983_1497934"
     #"0xfd2487cc0e5dce97f08be1bc8ef1dce8d5988b4d_1014288_12679208"
     #"0x5acc84a3e955bdd76467d3348077d003f00ffb97_9315825_9454321"

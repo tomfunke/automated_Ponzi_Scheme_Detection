@@ -5,6 +5,10 @@ import os
 import etherenode
 
 def convert_df_coloumns(df):
+    # add a column "name" if it does not exist -> necessary for process mining
+    if "name" not in df.columns.values.tolist():
+        df["name"] = "" 
+
     # Rename the columns to match the OCEL standard
     df.rename(columns={"name": "concept:name"}, inplace=True)#concept:name is the activity
     df.rename(columns={"timeStamp": "time:timestamp"}, inplace=True)
@@ -147,14 +151,20 @@ def filter_txs_with_errors(df, txs_hashes):
 def rename_activities_in_calls(value_calls_df):
     # empty values in the column "concept:name"
     #TODO ist aber eigentlich nur bei bei den einfachen ponzis wie etheramid der Fall. bei augur stimmt das glaube nicht. siehe call dapp ether
-    mask = (value_calls_df["concept:name"].isna()) & (value_calls_df["calltype"] == "CALL")
+    mask = (value_calls_df["concept:name"].isna() | (value_calls_df["concept:name"] == "") ) & (value_calls_df["calltype"] == "CALL")
     value_calls_df.loc[mask, "concept:name"] = "call and transfer ether"
     
     return value_calls_df
 
 
-def get_address_type(addresses, node_url, folder_path):
-    list_address_type_file_path = os.path.join(folder_path, 'list_address_type.txt')
+def get_address_types(addresses, node_url, folder_path, contract_file_name):
+    """
+    This function checks if the addresses are smart contracts or externally owned accounts (EOAs)
+    and returns a dictionary with the address as the key and the address type as the value.
+    If the file list_address_type.txt exists, the function reads the file instead of connecting to the node.
+    If the file does not exist, the function connects to the Ethereum node to check the address types.
+    """
+    list_address_type_file_path = os.path.join(folder_path, 'list_address_type_'+contract_file_name+'.txt')
 
     if os.path.exists(list_address_type_file_path):
     # if file exists read file instead of connecting to the node
@@ -163,9 +173,12 @@ def get_address_type(addresses, node_url, folder_path):
             for line in file:
                 key, value = line.strip().split(':', 1)
                 address_dict[key] = value
+        
         print("Successfully read the list_address_type from the file")
         return address_dict
+    
     else:
+    # if file does not exist connect to the node    
         # check if the addresses are smart contracts or externally owned accounts (EOAs) by connecting to the Ethereum node
         set_of_addresses = set(addresses) # create a set of unique addresses for faster processing
         address_dict = etherenode.check_addresses_for_address_type(set_of_addresses, node_url)
@@ -175,10 +188,11 @@ def get_address_type(addresses, node_url, folder_path):
         with open(list_address_type_file_path, 'w') as file:
             for key, value in address_dict.items():
                 file.write(f"{key}:{value}\n")
+
         print("Successfully saved the list_address_type to a file")
         return address_dict
 
-def preprocess(format_type, trace_tree_path, events_dapp__path, value_calls_dapp_path, zero_value_calls_dapp_path, delegatecall_dapp_path, value_calls_non_dapp_path, folder_path, contract_file_name, node_url):
+def preprocess(format_type, trace_tree_path, events_dapp_path, value_calls_dapp_path, zero_value_calls_dapp_path, delegatecall_dapp_path, value_calls_non_dapp_path, folder_path, contract_file_name, node_url):
     """
     Filters errors & converts tables & saves them in a new file
 
@@ -209,7 +223,7 @@ def preprocess(format_type, trace_tree_path, events_dapp__path, value_calls_dapp
     #### PREPROCESSING ####
     #Create a list of tuples, each tuple containing the path and name of the file
     # This is done to avoid code duplication
-    dapp_list = [(events_dapp__path, "EVENTS DAPP"),
+    dapp_list = [(events_dapp_path, "EVENTS DAPP"),
                  (value_calls_dapp_path, "VALUE CALLS"), 
                  (zero_value_calls_dapp_path, "ZERO VALUE CALLS"), 
                  (delegatecall_dapp_path, "DELEGATECALL"),
@@ -227,11 +241,12 @@ def preprocess(format_type, trace_tree_path, events_dapp__path, value_calls_dapp
             #print(f"Skipping {dapp_name} processing as the DataFrame is empty or contains only zero values.")
             # flag dataframe as empty/ None
             dataframes[dapp_name] = None
+            
         else:
             #### Actual Preprocessing here ####
             dapp_df = filter_txs_with_errors(dapp_df, set_of_txs_to_revert)
             dapp_df = convert_df_coloumns(dapp_df)
-            
+
             # Rename activities in Calls (every file except EVENTS DAPP)
             if dapp_name != "EVENTS DAPP":
                 dapp_df = rename_activities_in_calls(dapp_df)
@@ -251,15 +266,17 @@ def preprocess(format_type, trace_tree_path, events_dapp__path, value_calls_dapp
     combined_df = pd.concat([df for df in dataframes.values() if df is not None])
 
     # sort by timestamp (timestamp of the block), transaction index (order in block) and trace position (order in transaction)
-    # TODO: implement tracePosDepth statt tracePos für Baumstruktur
+    # blocknumber vernachlässigen, da timestamp gleiche ist?
+    # timestamp und transactionIndex sind nicht unique, da eine Transaktion mehrere Events haben kann -> nutze daher tracePos!
+    # TODO: implement tracePosDepth statt tracePos für Baumstruktur -> furter research
     combined_df = combined_df.sort_values(["time:timestamp", "transactionIndex", "tracePos"])
     
-    # combine the "from" and "to" columns into a new column "Address_o" (object)
+    # combine the "address" and "to" columns into a new column "Address_o" (object)
     combined_df["Address_o"] = combined_df["to"].combine_first(combined_df["address"])
 
     # adds a coloumn address_types to determine if the address is a smart contract or an externally owned account (EOA)
-    address_type_map = get_address_type(combined_df["Address_o"], node_url, folder_path)
-    combined_df["Address_Type"] = combined_df["Address_o"].map(address_type_map)
+    address_type_map = get_address_types(combined_df["Address_o"], node_url, folder_path, contract_file_name)
+    combined_df["Address_Type"] = combined_df["Address_o"].map(address_type_map) # map the address to the address type from the dictionary
     
     save_preprocessed_file(combined_df, os.path.join(folder_path,'df_combinded_' + contract_file_name), format_type)
     print("preprocess done")
@@ -269,3 +286,5 @@ def preprocess(format_type, trace_tree_path, events_dapp__path, value_calls_dapp
     object_types is a list of strings that represent the columns in the dataframe that should be used as objects -> just the name of the coloumns
     """
     #ocel = pm4py.convert_log_to_ocel(df, object_types=object_selection, additional_event_attributes = remaining_attributes)
+    #print("ocel done")
+    #return ocel

@@ -83,8 +83,8 @@ def convert_events_dapp_to_ocel(format_type, file_path, object_selection):
     df = convert_df_coloumns(df)
 
     # Creates a list of all columns that are additional for the OCEL as event attributes: All Coloumns - the chosen object - the standard columns time and activity
-    columns_to_remove = np.array(['concept:name', 'time:timestamp']+object_selection)
-    remaining_attributes = np.setdiff1d(df.columns.to_numpy(), columns_to_remove)
+    main_coloumns = np.array(['concept:name', 'time:timestamp']+object_selection)
+    remaining_attributes = np.setdiff1d(df.columns.to_numpy(), main_coloumns)
     #example_objects = ["user"] # either choose objective via Input here or its always coloumn 9! (user/owner)
     #remaining_attributes = ["address", "tracePos", "tracePosDepth", "hash", "blocknumber"] + additional_columns
     
@@ -264,6 +264,8 @@ def preprocess(format_type, trace_tree_path, events_dapp_path, value_calls_dapp_
     
     # combines all dataframes in the dictionary dataframes if they are not None /empty
     combined_df = pd.concat([df for df in dataframes.values() if df is not None])
+    combined_df = combined_df.reset_index(drop=True) # reset the index, which will assign a new, unique index to each row
+
 
     # sort by timestamp (timestamp of the block), transaction index (order in block) and trace position (order in transaction)
     # blocknumber vernachlässigen, da timestamp gleiche ist?
@@ -276,7 +278,8 @@ def preprocess(format_type, trace_tree_path, events_dapp_path, value_calls_dapp_
 
     # adds a coloumn address_types to determine if the address is a smart contract or an externally owned account (EOA)
     address_type_map = get_address_types(combined_df["Address_o"], node_url, folder_path, contract_file_name)
-    combined_df["Address_Type"] = combined_df["Address_o"].map(address_type_map) # map the address to the address type from the dictionary
+    # map the address to the address type from the dictionary
+    combined_df["Address_Type"] = combined_df["Address_o"].map(address_type_map) 
     
     save_preprocessed_file(combined_df, os.path.join(folder_path,'df_combinded_' + contract_file_name), format_type)
     print("preprocess done")
@@ -285,6 +288,15 @@ def preprocess(format_type, trace_tree_path, events_dapp_path, value_calls_dapp_
     converts the dataframe to ocel format with the given object types
     object_types is a list of strings that represent the columns in the dataframe that should be used as objects -> just the name of the coloumns
     """
-    #ocel = pm4py.convert_log_to_ocel(df, object_types=object_selection, additional_event_attributes = remaining_attributes)
-    #print("ocel done")
-    #return ocel
+    object_selection = ["Address_o"] # ,"Address_Type"
+    object_attributes = {"Address_o": "Address_Type"}
+
+    # Creates a list of all columns that are additional for the OCEL as event attributes: All Coloumns - the chosen object - the standard columns time and activity
+    main_coloumns = np.array(['concept:name', 'time:timestamp']+object_selection)
+    remaining_attributes = np.setdiff1d(combined_df.columns.to_numpy(), main_coloumns)
+
+    ocel = pm4py.convert_log_to_ocel(combined_df, object_types = object_selection, additional_object_attributes = object_attributes, additional_event_attributes = remaining_attributes)
+    #ocel = pm4py.convert_log_to_ocel(combined_df, object_types = object_selection, additional_event_attributes = remaining_attributes)
+    log = pm4py.write_ocel_csv(ocel, os.path.join(folder_path,'df_ocel_events_' + contract_file_name + ".csv"),os.path.join(folder_path,'df_ocel_objects_' + contract_file_name + ".csv"))
+    print("ocel converting done")
+    return ocel

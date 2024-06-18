@@ -3,8 +3,7 @@ import pandas as pd
 import pm_discovery
 import preprocess_and_convert_to_ocel
 import helper
-import etherenode
-import json
+import ponzi_criteria
 
 def main():
     """
@@ -43,13 +42,20 @@ def main():
 
     Output is
     """
-    # Load the config file
-    with open('config.json', 'r') as file:
-        config = json.load(file)
+    # Read the config file
+    config = helper.check_config_file()
     
+    # Extract the values from the config file
+    port = config["port"]
+    protocol = config["protocol"]
+    host = config["host"]
+    input_folder_path = config["input_folder_path"]
+    input_contract_file_name = config["input_contract_file_name"]
+
     # Set the paths for faster testing:
     # Path to log folder
-    input_folder_path = "/Users/tomfunke/Desktop/logging/locale_extraktion/inklusive_nondapp/forsage_50k_ohne45e"
+    input_folder_path = "/Users/tomfunke/Desktop/logging/locale_extraktion/inklusive_nondapp/millionmoney"
+    #"/Users/tomfunke/Desktop/logging/locale_extraktion/inklusive_nondapp/forsage_50k_ohne45e"
     #"/Users/tomfunke/Desktop/logging/ServerKopie/resources_forsage_non_2"
     #"/Users/tomfunke/Desktop/logging/locale_extraktion/inklusive_nondapp/etheramid"
     #"/Users/tomfunke/Desktop/logging/locale_extraktion/etherDoubler"
@@ -58,27 +64,21 @@ def main():
     
     # Just the name without the prefix and suffix (main contract_address with range withour file format)
     # example: "0x9758da9b4d001ed2d0df46d25069edf53750767a_1335983_1497934"
-    input_contract_file_name = "0x5acc84a3e955bdd76467d3348077d003f00ffb97_9391396_9441396"
+    input_contract_file_name = "0xbcf935d206ca32929e1b887a07ed240f0d8ccd22_8447267_8654321"
+    #"0x5acc84a3e955bdd76467d3348077d003f00ffb97_9391396_9441396"
     #"0x5acc84a3e955bdd76467d3348077d003f00ffb97_9315825_9500321"
     #"0x9758da9b4d001ed2d0df46d25069edf53750767a_1335983_1497934"
     #"0xfd2487cc0e5dce97f08be1bc8ef1dce8d5988b4d_1014288_12679208"
     #"0x5acc84a3e955bdd76467d3348077d003f00ffb97_9315825_9454321"
     #"0xbcf935d206ca32929e1b887a07ed240f0d8ccd22_8447267_8654321"
     
-    """
-    your ethereum node configuration
-    """
-    port = config["port"]
-    protocol = config["protocol"]
-    host = config["host"]
-    
-    # ethereum node url
-    node_url = protocol + host + ":" + str(port)
-
-
     # Object selection
     # TODO: Noch zutreffend bei unterdschiedlichen files?
     object_selection = ["from"]
+    
+    ##
+    # ethereum node url
+    node_url = protocol + host + ":" + str(port)
 
     """
     Pathing
@@ -98,21 +98,19 @@ def main():
     Here begins the main function
     """
     # Preprocess the CSV and get the OCEL object: https://pm4py.fit.fraunhofer.de/static/assets/api/2.7.8/pm4py.objects.ocel.html#pm4py.objects.ocel.obj.OCEL
-    output = preprocess_and_convert_to_ocel.preprocess(format_type_trace_tree, trace_tree_path,events_dapp__path, value_calls_dapp_path, zero_value_calls_dapp_path, delegatecall_dapp_path, value_calls_non_dapp_path, input_folder_path, input_contract_file_name, node_url)
+    ocel = preprocess_and_convert_to_ocel.preprocess(format_type_trace_tree, trace_tree_path,events_dapp__path, value_calls_dapp_path, zero_value_calls_dapp_path, delegatecall_dapp_path, value_calls_non_dapp_path, input_folder_path, input_contract_file_name, node_url)
     
-    # test ethernode
-    addresses = ["0x9758da9b4d001ed2d0df46d25069edf53750767a","0x176CA8f5676D5B916a5f65926124218C27a4c47A"]
-    #etherenode.check_addresses_for_address_type(addresses, node_url)
-
     # legacy code: for each file own preprocess and ocel conversion
     #events_ocel = preprocess_and_convert_to_ocel.convert_events_dapp_to_ocel(format_type, input_file_path, object_selection)
     #Calls_ocel = preprocess_and_convert_to_ocel.convert_call_dapp_to_ocel(format_type, input_file_path, object_selection)
-    """
+    
     # Discover the Object-Centric Petri Net (OC-PN) and Object-Centric Directly-Follows Graph (OC-DFG)
-    #ocel is the input object
-    #filename_without_extension is for saving the output
-    pm_discovery.pn_and_dfg_discovery(ocel, input_contract_address_with_range)
-    """
+    #ocel is the input object centric log
+    #filename is for saving the output
+    #pm_discovery.pn_and_dfg_discovery(ocel, input_contract_file_name)
+
+    
+    ponzi_criteria.check_ponzi_criteria(ocel)
 
 if __name__ == "__main__":
     main()

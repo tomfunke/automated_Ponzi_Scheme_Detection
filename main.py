@@ -4,12 +4,13 @@ import pm_discovery
 import preprocess_and_convert_to_ocel
 import helper
 import ponzi_criteria
+import pm4py
 
 def main():
     """
     Input is
     (1) set the path to the log folder,
-    (2) set the name of the files without the prefix and suffix (main contract_address with range),
+    (2) set the name of the files without the prefix and suffix (main contract_address with range if range is part of name),
     (3) set the object selection (e.g., ["from", "to", "input", "output", "gas", "gasUsed", "functionName", "error", "calltype"])
     (4) set the ethereum node configuration (host, port, protocol)
     Therefore use config file to set the path to the log folder and the name of the files and the ethereum node configuration!
@@ -54,23 +55,26 @@ def main():
 
     # Set the paths for faster testing:
     # Path to log folder
-    input_folder_path = "/Users/tomfunke/Desktop/logging/locale_extraktion/inklusive_nondapp/millionmoney"
+    input_folder_path = "/Users/tomfunke/Desktop/logging/locale_extraktion/inklusive_nondapp/forsage_50k_ohne45e"
+    #"/Users/tomfunke/Desktop/logging/locale_extraktion/inklusive_nondapp/yacht"
+    #"/Users/tomfunke/Desktop/logging/ServerKopie/resources_kitty_non"
+    #"/Users/tomfunke/Desktop/logging/locale_extraktion/inklusive_nondapp/millionmoney"
     #"/Users/tomfunke/Desktop/logging/locale_extraktion/inklusive_nondapp/forsage_50k_ohne45e"
     #"/Users/tomfunke/Desktop/logging/ServerKopie/resources_forsage_non_2"
     #"/Users/tomfunke/Desktop/logging/locale_extraktion/inklusive_nondapp/etheramid"
-    #"/Users/tomfunke/Desktop/logging/locale_extraktion/etherDoubler"
-    #"/Users/tomfunke/Desktop/logging/locale_extraktion/forsage_120k_60k_ab_creation"
-    #"/Users/tomfunke/Desktop/logging/locale_extraktion/millionmoney_200k"
+  
     
     # Just the name without the prefix and suffix (main contract_address with range withour file format)
     # example: "0x9758da9b4d001ed2d0df46d25069edf53750767a_1335983_1497934"
-    input_contract_file_name = "0xbcf935d206ca32929e1b887a07ed240f0d8ccd22_8447267_8654321"
-    #"0x5acc84a3e955bdd76467d3348077d003f00ffb97_9391396_9441396"
+    input_contract_file_name = "0x5acc84a3e955bdd76467d3348077d003f00ffb97_9391396_9441396"
+    #"0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d_12287507_12354321"
+    #"0x06012c8cf97bead5deae237070f9587f8e7a266d_4605167_4654300"
+    #"0xbcf935d206ca32929e1b887a07ed240f0d8ccd22_8447267_8654321"
+    #"0x5acc84a3e955bdd76467d3348077d003f00ffb97_9391396_9441396" #forsage
     #"0x5acc84a3e955bdd76467d3348077d003f00ffb97_9315825_9500321"
     #"0x9758da9b4d001ed2d0df46d25069edf53750767a_1335983_1497934"
     #"0xfd2487cc0e5dce97f08be1bc8ef1dce8d5988b4d_1014288_12679208"
-    #"0x5acc84a3e955bdd76467d3348077d003f00ffb97_9315825_9454321"
-    #"0xbcf935d206ca32929e1b887a07ed240f0d8ccd22_8447267_8654321"
+
     
     # Object selection
     # TODO: Noch zutreffend bei unterdschiedlichen files?
@@ -107,10 +111,14 @@ def main():
     # Discover the Object-Centric Petri Net (OC-PN) and Object-Centric Directly-Follows Graph (OC-DFG)
     #ocel is the input object centric log
     #filename is for saving the output
-    #pm_discovery.pn_and_dfg_discovery(ocel, input_contract_file_name)
+    ###pm_discovery.pn_and_dfg_discovery(ocel, input_contract_file_name)
 
+    #TODO Skip the preproccess by loading the ocel from the file
+    #pd.options.mode.copy_on_write = True  # settingwithcopywarning-in-pandas
+    #ocel = pm4py.read_ocel(os.path.join(input_folder_path, 'df_ocel_events_' + input_contract_file_name + '.csv'), os.path.join(input_folder_path, 'df_ocel_objects_' + input_contract_file_name + '.csv'))
     
-    ponzi_criteria.check_ponzi_criteria(ocel)
+    # Check the Ponzi criteria
+    ponzi_criteria.check_ponzi_criteria(ocel, input_contract_file_name)
 
 if __name__ == "__main__":
     main()

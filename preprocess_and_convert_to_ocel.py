@@ -151,9 +151,11 @@ def filter_txs_with_errors(df, txs_hashes):
 def rename_activities_in_calls(value_calls_df):
     # empty values in the column "concept:name"
     #TODO ist aber eigentlich nur bei bei den einfachen ponzis wie etheramid der Fall. bei augur stimmt das glaube nicht. siehe call dapp ether
+    #TODO auch call_dapp_NO_ether_transfer werden ja hier umbenannt zu ether transfer -> das ist falsch!
     mask = (value_calls_df["concept:name"].isna() | (value_calls_df["concept:name"] == "") ) & (value_calls_df["calltype"] == "CALL")
     value_calls_df.loc[mask, "concept:name"] = "call and transfer ether"
     
+    #TODO <FunctionName> noch rauscutten
     return value_calls_df
 
 
@@ -256,7 +258,8 @@ def preprocess(format_type, trace_tree_path, events_dapp_path, value_calls_dapp_
             #store each DataFrame with a specific variable name dynamically after processing, for further data handling
             dataframes[dapp_name] = dapp_df
     
-    
+    print("preprocessed each file. Now combining...")
+
     #can use the dataframes here within in dictionary
     #events_dapp_df = dataframes["EVENTS DAPP"]
     #if dataframes["ZERO VALUE CALLS"] is not None    
@@ -280,23 +283,37 @@ def preprocess(format_type, trace_tree_path, events_dapp_path, value_calls_dapp_
     address_type_map = get_address_types(combined_df["Address_o"], node_url, folder_path, contract_file_name)
     # map the address to the address type from the dictionary
     combined_df["Address_Type"] = combined_df["Address_o"].map(address_type_map) 
+
+    # adds a coloumn address_types to determine if the from-address is a smart contract or an externally owned account (EOA)
+    address_type_map = get_address_types(combined_df["from"], node_url, folder_path, contract_file_name)
+    combined_df["from_Type"] = combined_df["from"].map(address_type_map)
     
     save_preprocessed_file(combined_df, os.path.join(folder_path,'df_combinded_' + contract_file_name), format_type)
     print("preprocess done")
 
     """
+    OCEL
+
     converts the dataframe to ocel format with the given object types
     object_types is a list of strings that represent the columns in the dataframe that should be used as objects -> just the name of the coloumns
     """
-    object_selection = ["Address_o"] # ,"Address_Type"
-    object_attributes = {"Address_o": "Address_Type"}
+    print("ocel converting...")
+
+    object_selection = ["Address_o","from"] # ,"Address_Type"
+    object_attributes = {"Address_o": "Address_Type",
+                         "from": "from_Type"
+                         }
 
     # Creates a list of all columns that are additional for the OCEL as event attributes: All Coloumns - the chosen object - the standard columns time and activity
     main_coloumns = np.array(['concept:name', 'time:timestamp']+object_selection)
-    remaining_attributes = np.setdiff1d(combined_df.columns.to_numpy(), main_coloumns)
+    remaining_attributes = np.setdiff1d(combined_df.columns.to_numpy(), main_coloumns) # remaining = all - main
 
+    #Ocel with or without addtional object attributes:
     ocel = pm4py.convert_log_to_ocel(combined_df, object_types = object_selection, additional_object_attributes = object_attributes, additional_event_attributes = remaining_attributes)
     #ocel = pm4py.convert_log_to_ocel(combined_df, object_types = object_selection, additional_event_attributes = remaining_attributes)
-    log = pm4py.write_ocel_csv(ocel, os.path.join(folder_path,'df_ocel_events_' + contract_file_name + ".csv"),os.path.join(folder_path,'df_ocel_objects_' + contract_file_name + ".csv"))
+    
+    # Save the OCEL events and object to a file
+    pm4py.write_ocel_csv(ocel, os.path.join(folder_path,'df_ocel_events_' + contract_file_name + ".csv"),os.path.join(folder_path,'df_ocel_objects_' + contract_file_name + ".csv"))
+    
     print("ocel converting done")
     return ocel

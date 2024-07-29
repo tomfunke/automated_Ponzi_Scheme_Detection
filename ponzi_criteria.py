@@ -7,6 +7,11 @@ from pm4py.visualization.bpmn import visualizer as bpmn_visualizer
 from pm4py.objects.conversion.bpmn import converter as bpmn_converter
 from pm4py.visualization.petri_net import visualizer as pn_visualizer
 from pm4py.objects.petri_net.exporter import exporter as pnml_exporter
+from collections import defaultdict
+from pm4py.objects.ocel.util import flattening as ocel_flattening
+
+"""
+Auf forsage activites bezogen
 
 # Load the OCEL file
 def load_ocel(file_path):
@@ -69,40 +74,22 @@ def analyze_potential_ponzi(file_path):
 
 # Run the analysis
 #analyze_potential_ponzi('path_to_your_ocel_file.csv')
+"""
 
-def check_ponzi_criteria(ocel, filename_without_extension):
-    print("Start checking Ponzi criteria:")
-    print(pm4py.ocel_objects_summary(ocel)) # life cycle of the objects
-
-
-    df_ocel = ocel.get_extended_table() # The extended table "flattens" the structure, making it easier to analyze with traditional process mining techniques.
-    print(df_ocel)
-    # try pandas an ocel
-    df = pd.DataFrame(df_ocel)
-    print(df.head())
-
-    # funktionen testen:
-    G = pm4py.convert.convert_ocel_to_networkx(ocel)
-    print(G)
-    edge_types = set(nx.get_edge_attributes(G, 'type').values())
-    print("Edge types:", edge_types)
-
+def load_bpmn_petri(filename_without_extension):
     #bpmn testen
     # Load the BPMN file
-    #bpmn_graph = bpmn_importer.apply('/Users/tomfunke/Desktop/diagram_1.bpmn')
-    #bpmn_graph = bpmn_importer.apply("/Users/tomfunke/Downloads/diagram.bpmn")
     bpmn_graph = bpmn_importer.apply("input/ponzi.bpmn")
     
-
-    # Visualize the BPMN
-    ##gviz = bpmn_visualizer.apply(bpmn_graph)
-    ##bpmn_visualizer.view(gviz)
+    # Visualize the imported BPMN
+    gviz = bpmn_visualizer.apply(bpmn_graph)
+    bpmn_visualizer.view(gviz)
 
     # Convert BPMN to Petri net 
     net, initial_marking, final_marking = bpmn_converter.apply(bpmn_graph)
-    print(net)
-    print(initial_marking)
-    print(final_marking)
+    print("net:", net)
+    print("initial_marking:",initial_marking)
+    print("final_marking:",final_marking)
     print("Places in the net:", net.places)
     print("Transitions in the net:", net.transitions)
 
@@ -117,13 +104,99 @@ def check_ponzi_criteria(ocel, filename_without_extension):
     
     # Save the Petri net in PNML format
     pnml_exporter.apply(net, initial_marking, f'output/saved_petri_net_{filename_without_extension}.pnml')
+
+    return net, initial_marking, final_marking
+
+def input_output_flow(ocel, filename_without_extension):
+    # Step 2: Extract relevant events and attributes
+    events = ocel.events
+    objects = ocel.objects
     
+    # Step 3: Process the data
+    address_balance = defaultdict(lambda: {"received": 0, "invested": 0, "first_transaction": None, "interaction_as_sender": 0, "interaction_as_receiver": 0})
+
+    def update_balance(from_addr, to_addr, value):
+        if from_addr:
+            address_balance[from_addr]["invested"] += value
+            address_balance[from_addr]["interaction_as_sender"] += 1
+        if to_addr:
+            address_balance[to_addr]["received"] += value
+            address_balance[to_addr]["interaction_as_receiver"] += 1
+    
+    first_investment = {}
+    for _, row in events.iterrows():
+        if row["callvalue"] > 0:
+            update_balance(row["from"], row["to"], row["callvalue"]) # Update the balance for the sender and receiver interacting with the contract
+
+            # Check the timestamp of the first investment for each user = first transaction as sender (from)
+            user = row["from"]
+            timestamp = row["ocel:timestamp"]
+            if user not in first_investment:
+                first_investment[user] = timestamp
+                address_balance[user]["first_transaction"] = timestamp
+            else:
+                first_investment[user] = min(first_investment[user], timestamp)
+                address_balance[user]["first_transaction"] = timestamp
+            
+
+    
+    # Convert wei to ether
+    def wei_to_ether(wei_value):
+        return wei_value / 10**18
+    
+    # Save the results
+    with open(f"output/address_balance_{filename_without_extension}.csv", "w") as f:
+        f.write("address,received,invested,first_transaction,interactions_as_sender, interactions_as_receiver\n")
+        for address, values in address_balance.items():
+            received_ether = wei_to_ether(values['received'])
+            invested_ether = wei_to_ether(values['invested'])
+            f.write(f"{address},{received_ether},{invested_ether},{values['first_transaction']},{values['interaction_as_sender']},{values['interaction_as_receiver']}\n")
+    
+    ######### calculate
+    # the SC has a special role in the Ponzi scheme, as it is the contract that receives the ether from the users and distributes it to the other users.
+    # The SC is the address that receives the most ether from the users.
+    sc_address = max(address_balance, key=lambda x: address_balance[x]["received"])
+    print(f"The smart contract address is: {sc_address}")
+
+    # Addresses with no incoming transactions to the SC are considered to be the first users in the Ponzi scheme. They should have no first_transaction timestamp.
+    first_users = [address for address in address_balance if address_balance[address]["invested"] == 0]
+    print(f"The first users in the Ponzi scheme are: {first_users}")
+
+    # calculate the profit of each user except the main SC
+    # The profit of a user is the ether received minus the ether invested.
+    user_profits = {address: address_balance[address]["received"] - address_balance[address]["invested"] for address in address_balance if address != sc_address}
+    #TODO profit timestamp einbauen
+    
+    #TODO check mittels helper datei ob addresse eoa oder sc ist. vor allem für sc
+    return address_balance
+
+
+def check_ponzi_criteria(ocel, filename_without_extension):
+    print("Start checking Ponzi criteria:")
+
+    """
+    # netwrokx testen:
+    G = pm4py.convert.convert_ocel_to_networkx(ocel)
+    #print(G)
+    edge_types = set(nx.get_edge_attributes(G, 'type').values())
+    #print("Edge types:", edge_types)
+    """
 
     """
     It's important to note that while events_df is a Pandas DataFrame, it's a view into the OCEL data structure. 
     If you modify this DataFrame, you may need to update the OCEL object to reflect these changes, depending on what operations you're performing
     """
     events_df = ocel.events #ocel.events returns a Pandas DataFrame
+    #print(ocel.objects)
+
+    input_output_flow(ocel, filename_without_extension)
+
+    net, initial_marking, final_marking = load_bpmn_petri(filename_without_extension)
+
+    traditional_log = ocel_flattening.flatten(ocel, "ocel:type:Address_o") # gegebenenfalls noch from_o addresse als objekt
+    replayed_traces = pm4py.conformance_diagnostics_token_based_replay(traditional_log, net, initial_marking, final_marking)
+    print(replayed_traces)
+
     """
     Updating OCEL:
     After manipulating the DataFrame, you can update the OCEL object:

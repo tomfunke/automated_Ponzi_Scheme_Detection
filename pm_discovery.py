@@ -21,6 +21,7 @@ def pn_and_dfg_discovery(ocel, filename_without_extension):
     #print(pm4py.ocel_get_object_types(ocel))
     #print(pm4py.ocel_object_type_activities(ocel))
     #print(pm4py.ocel_temporal_summary(ocel))
+    #print(pm4py.ocel_objects_summary(ocel)) # life cycle of the objects
     print(pm4py.ocel_objects_summary(ocel))
     
     
@@ -45,7 +46,7 @@ def pn_and_dfg_discovery(ocel, filename_without_extension):
     # for bpmn you need to convert the ocel into xes by flattening
     # Assuming 'ocel' is your Object-Centric Event Log
     # Also need a ocel type to flatten
-    traditional_log = ocel_flattening.flatten(ocel, "ocel:type:Address_o")
+    traditional_log = ocel_flattening.flatten(ocel, "ocel:type:Address_o") # gegebenenfalls noch from_o addresse als objekt
 
     bpmn_model = pm4py.discover_bpmn_inductive(traditional_log)
     pm4py.view_bpmn(bpmn_model)

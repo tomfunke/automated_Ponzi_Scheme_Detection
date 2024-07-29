@@ -253,6 +253,11 @@ def preprocess(format_type, trace_tree_path, events_dapp_path, value_calls_dapp_
             if dapp_name != "EVENTS DAPP":
                 dapp_df = rename_activities_in_calls(dapp_df)
             
+            # preprocess only EVENTS dapp
+            if dapp_name == "EVENTS DAPP":
+                # convert the address to lowercase: in a old version of the extractor the address was not converted to lowercase
+                dapp_df["address"] = dapp_df["address"].str.lower()
+
             save_preprocessed_file(dapp_df, dapp_path, format_type)
 
             #store each DataFrame with a specific variable name dynamically after processing, for further data handling
@@ -272,7 +277,7 @@ def preprocess(format_type, trace_tree_path, events_dapp_path, value_calls_dapp_
 
     # sort by timestamp (timestamp of the block), transaction index (order in block) and trace position (order in transaction)
     # blocknumber vernachlässigen, da timestamp gleiche ist?
-    # timestamp und transactionIndex sind nicht unique, da eine Transaktion mehrere Events haben kann -> nutze daher tracePos!
+    # timestamp und transactionIndex sind nicht unique, da eine Transaktion mehrere Events haben kann -> nutze daher tracePos! in kombination mit den anderen beiden
     # TODO: implement tracePosDepth statt tracePos für Baumstruktur -> furter research
     combined_df = combined_df.sort_values(["time:timestamp", "transactionIndex", "tracePos"])
     
@@ -288,6 +293,9 @@ def preprocess(format_type, trace_tree_path, events_dapp_path, value_calls_dapp_
     address_type_map = get_address_types(combined_df["from"], node_url, folder_path, contract_file_name)
     combined_df["from_Type"] = combined_df["from"].map(address_type_map)
     
+    # for from object
+    combined_df["from_o"] = combined_df["from"]
+
     save_preprocessed_file(combined_df, os.path.join(folder_path,'df_combinded_' + contract_file_name), format_type)
     print("preprocess done")
 
@@ -299,9 +307,9 @@ def preprocess(format_type, trace_tree_path, events_dapp_path, value_calls_dapp_
     """
     print("ocel converting...")
 
-    object_selection = ["Address_o","from"] # ,"Address_Type"
+    object_selection = ["Address_o","from_o"] # ,"Address_Type", "from_Type" # types are additional attributes to differentiate between smart contracts and externally owned accounts (EOAs)
     object_attributes = {"Address_o": "Address_Type",
-                         "from": "from_Type"
+                         "from_o": "from_Type"
                          }
 
     # Creates a list of all columns that are additional for the OCEL as event attributes: All Coloumns - the chosen object - the standard columns time and activity

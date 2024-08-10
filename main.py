@@ -74,11 +74,6 @@ def main():
     #"0x5acc84a3e955bdd76467d3348077d003f00ffb97_9315825_9500321"
     #"0x9758da9b4d001ed2d0df46d25069edf53750767a_1335983_1497934"
     #"0xfd2487cc0e5dce97f08be1bc8ef1dce8d5988b4d_1014288_12679208"
-
-    
-    # Object selection
-    # TODO: Noch zutreffend bei unterdschiedlichen files?
-    object_selection = ["from"]
     
     ##
     # ethereum node url
@@ -105,6 +100,7 @@ def main():
     ocel = preprocess_and_convert_to_ocel.preprocess(format_type_trace_tree, trace_tree_path,events_dapp__path, value_calls_dapp_path, zero_value_calls_dapp_path, delegatecall_dapp_path, value_calls_non_dapp_path, input_folder_path, input_contract_file_name, node_url)
     
     # legacy code: for each file own preprocess and ocel conversion
+    #object_selection = ["from"]
     #events_ocel = preprocess_and_convert_to_ocel.convert_events_dapp_to_ocel(format_type, input_file_path, object_selection)
     #Calls_ocel = preprocess_and_convert_to_ocel.convert_call_dapp_to_ocel(format_type, input_file_path, object_selection)
     
@@ -118,7 +114,7 @@ def main():
     #ocel = pm4py.read_ocel(os.path.join(input_folder_path, 'df_ocel_events_' + input_contract_file_name + '.csv'), os.path.join(input_folder_path, 'df_ocel_objects_' + input_contract_file_name + '.csv'))
     
     # Check the Ponzi criteria
-    ponzi_criteria.check_ponzi_criteria(ocel, input_contract_file_name)
+    ponzi_criteria.check_ponzi_criteria(ocel, input_contract_file_name, input_folder_path)
 
 if __name__ == "__main__":
     main()

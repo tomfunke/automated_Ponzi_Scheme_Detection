@@ -41,3 +41,18 @@ def check_config_file():
 
     return config
 
+def open_address_file(folder_path, contract_file_name):
+    list_address_type_file_path = os.path.join(folder_path, 'list_address_type_'+contract_file_name+'.txt')
+    if not os.path.isfile(list_address_type_file_path):
+        print("The file list_address_type does not exist.")
+        sys.exit(1)
+    
+    with open(list_address_type_file_path, 'r') as file:
+        address_dict = {}
+        for line in file:
+                key, value = line.strip().split(':', 1)
+                address_dict[key] = value
+        
+    print("Successfully read the list_address_type from the file")
+    return address_dict
+

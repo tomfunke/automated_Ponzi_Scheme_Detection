@@ -9,7 +9,7 @@ from pm4py.visualization.petri_net import visualizer as pn_visualizer
 from pm4py.objects.petri_net.exporter import exporter as pnml_exporter
 from collections import defaultdict
 from pm4py.objects.ocel.util import flattening as ocel_flattening
-
+import helper
 """
 Auf forsage activites bezogen
 
@@ -83,7 +83,7 @@ def load_bpmn_petri(filename_without_extension):
     
     # Visualize the imported BPMN
     gviz = bpmn_visualizer.apply(bpmn_graph)
-    bpmn_visualizer.view(gviz)
+    #bpmn_visualizer.view(gviz)
 
     # Convert BPMN to Petri net 
     net, initial_marking, final_marking = bpmn_converter.apply(bpmn_graph)
@@ -97,7 +97,7 @@ def load_bpmn_petri(filename_without_extension):
     gviz = pn_visualizer.apply(net, initial_marking, final_marking)
 
     # Display the visualization (this will open in a new window)
-    pn_visualizer.view(gviz)
+    #pn_visualizer.view(gviz)
 
     # Save as PNG
     pn_visualizer.save(gviz, f'output/petri_net_visualization_{filename_without_extension}.png')
@@ -107,7 +107,7 @@ def load_bpmn_petri(filename_without_extension):
 
     return net, initial_marking, final_marking
 
-def input_output_flow(ocel, filename_without_extension):
+def input_output_flow(ocel, filename_without_extension, folder_path):
     # Step 2: Extract relevant events and attributes
     events = ocel.events
     objects = ocel.objects
@@ -167,12 +167,16 @@ def input_output_flow(ocel, filename_without_extension):
     user_profits = {address: address_balance[address]["received"] - address_balance[address]["invested"] for address in address_balance if address != sc_address}
     #TODO profit timestamp einbauen
     
-    #TODO check mittels helper datei ob addresse eoa oder sc ist. vor allem für sc
+    #TODO check mittels helper datei ob addresse eoa oder sc ist
+    address_dict = helper.open_address_file(folder_path, filename_without_extension)
+    #print(address_dict["0xfffc07f1b5f1d6bd365aa1dbc9d16b1777f406a2"])
+
     return address_balance
 
 
-def check_ponzi_criteria(ocel, filename_without_extension):
+def check_ponzi_criteria(ocel, filename_without_extension, folder_path):
     print("Start checking Ponzi criteria:")
+    # firstly check the ponzi if he is a contract or an EOA: extractor gives just trace tree output, when trying to extract a EOA address without creation
 
     """
     # netwrokx testen:
@@ -189,13 +193,17 @@ def check_ponzi_criteria(ocel, filename_without_extension):
     events_df = ocel.events #ocel.events returns a Pandas DataFrame
     #print(ocel.objects)
 
-    input_output_flow(ocel, filename_without_extension)
-
+    input_output_flow(ocel, filename_without_extension, folder_path)
+    #todo check if erc-20 functions implemented 
+    """
+    my own BPMN
+    
     net, initial_marking, final_marking = load_bpmn_petri(filename_without_extension)
 
     traditional_log = ocel_flattening.flatten(ocel, "ocel:type:Address_o") # gegebenenfalls noch from_o addresse als objekt
     replayed_traces = pm4py.conformance_diagnostics_token_based_replay(traditional_log, net, initial_marking, final_marking)
     print(replayed_traces)
+    """
 
     """
     Updating OCEL:

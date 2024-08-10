@@ -3,7 +3,7 @@ This project uses process mining techniques to check if the ethereum blockchain 
 
 ## prerequisites
 1. Ethereum Archive Node with a Geth-based client
-2. tabular transaction trace data from the extractor
+2. tabular transaction trace data from the [extractor](https://github.com/rhobeck/trace_based_logging) 
 
 
 ## Installation

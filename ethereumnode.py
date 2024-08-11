@@ -47,3 +47,30 @@ def check_if_address_is_sc_or_eoa(address, w3):
 
     return address_type
 
+
+def check_if_address_is_erc20_token(address, node_url):
+    # Connection
+    w3 = check_if_connection_is_established(node_url)
+
+    # eth_getCode method to check if there is code at the address.
+    code = w3.eth.get_code(address)
+
+    if code == b'':  # No code at the address
+        return "EOC"
+    
+    # Define the ERC-20 function signatures
+    erc20_functions = [
+        '0x18160ddd',  # totalSupply()
+        '0x70a08231',  # balanceOf(address)
+        '0xa9059cbb',  # transfer(address,uint256)
+        '0x095ea7b3',  # approve(address,uint256)
+        '0x23b872dd'   # transferFrom(address,address,uint256)
+    ]
+
+    for func in erc20_functions:
+        result = w3.eth.call({'to': address, 'data': func})
+        if result == b'':  # If the function does not exist
+            return False
+
+    return "Token Address"
+

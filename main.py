@@ -114,7 +114,7 @@ def main():
     #ocel = pm4py.read_ocel(os.path.join(input_folder_path, 'df_ocel_events_' + input_contract_file_name + '.csv'), os.path.join(input_folder_path, 'df_ocel_objects_' + input_contract_file_name + '.csv'))
     
     # Check the Ponzi criteria
-    ponzi_criteria.check_ponzi_criteria(ocel, input_contract_file_name, input_folder_path)
+    ponzi_criteria.check_ponzi_criteria(ocel, input_contract_file_name, input_folder_path, node_url)
 
 if __name__ == "__main__":
     main()

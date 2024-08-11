@@ -2,7 +2,7 @@ import pm4py
 import pandas as pd
 import numpy as np
 import os
-import etherenode
+import ethereumnode
 
 def convert_df_coloumns(df):
     # add a column "name" if it does not exist -> necessary for process mining
@@ -183,7 +183,7 @@ def get_address_types(addresses, node_url, folder_path, contract_file_name):
     # if file does not exist connect to the node    
         # check if the addresses are smart contracts or externally owned accounts (EOAs) by connecting to the Ethereum node
         set_of_addresses = set(addresses) # create a set of unique addresses for faster processing
-        address_dict = etherenode.check_addresses_for_address_type(set_of_addresses, node_url)
+        address_dict = ethereumnode.check_addresses_for_address_type(set_of_addresses, node_url)
         print("Successfully checked the address types with the Ethereum node")
 
         # Save list_address_type as a file on your device for future use

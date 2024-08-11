@@ -10,6 +10,7 @@ from pm4py.objects.petri_net.exporter import exporter as pnml_exporter
 from collections import defaultdict
 from pm4py.objects.ocel.util import flattening as ocel_flattening
 import helper
+import ethereumnode
 """
 Auf forsage activites bezogen
 
@@ -174,7 +175,7 @@ def input_output_flow(ocel, filename_without_extension, folder_path):
     return address_balance
 
 
-def check_ponzi_criteria(ocel, filename_without_extension, folder_path):
+def check_ponzi_criteria(ocel, filename_without_extension, folder_path, node_url):
     print("Start checking Ponzi criteria:")
     # firstly check the ponzi if he is a contract or an EOA: extractor gives just trace tree output, when trying to extract a EOA address without creation
 
@@ -194,7 +195,11 @@ def check_ponzi_criteria(ocel, filename_without_extension, folder_path):
     #print(ocel.objects)
 
     input_output_flow(ocel, filename_without_extension, folder_path)
+    
     #todo check if erc-20 functions implemented 
+    main_smart_contract = filename_without_extension.split('_')[0]
+    print("Main smart contract:", main_smart_contract)
+    ethereumnode.check_if_address_is_erc20_token(main_smart_contract, node_url)
     """
     my own BPMN
     

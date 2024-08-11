@@ -158,6 +158,7 @@ def input_output_flow(ocel, filename_without_extension, folder_path):
     # The SC is the address that receives the most ether from the users.
     sc_address = max(address_balance, key=lambda x: address_balance[x]["received"])
     print(f"The smart contract address is: {sc_address}")
+    #TODO check if sc_address is a TOKEN
 
     # Addresses with no incoming transactions to the SC are considered to be the first users in the Ponzi scheme. They should have no first_transaction timestamp.
     first_users = [address for address in address_balance if address_balance[address]["invested"] == 0]
@@ -196,10 +197,13 @@ def check_ponzi_criteria(ocel, filename_without_extension, folder_path, node_url
 
     input_output_flow(ocel, filename_without_extension, folder_path)
     
-    #todo check if erc-20 functions implemented 
+    #check if token functions implemented 
     main_smart_contract = filename_without_extension.split('_')[0]
     print("Main smart contract:", main_smart_contract)
-    ethereumnode.check_if_address_is_erc20_token(main_smart_contract, node_url)
+    #TODO als main address eher sc_address aus input_output_flow nehmen, welche die meisten ether erhalten hat
+    which_token = ethereumnode.check_if_address_is_a_token(main_smart_contract, node_url)
+    print("address is ",which_token)
+
     """
     my own BPMN
     

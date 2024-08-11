@@ -183,6 +183,7 @@ def get_address_types(addresses, node_url, folder_path, contract_file_name):
     # if file does not exist connect to the node    
         # check if the addresses are smart contracts or externally owned accounts (EOAs) by connecting to the Ethereum node
         set_of_addresses = set(addresses) # create a set of unique addresses for faster processing
+        #print(set_of_addresses)
         address_dict = ethereumnode.check_addresses_for_address_type(set_of_addresses, node_url)
         print("Successfully checked the address types with the Ethereum node")
 
@@ -258,6 +259,12 @@ def preprocess(format_type, trace_tree_path, events_dapp_path, value_calls_dapp_
                 # convert the address to lowercase: in a old version of the extractor the address was not converted to lowercase
                 dapp_df["address"] = dapp_df["address"].str.lower()
 
+                # Check if the "to" column exists before applying the replacement because not all Dapps have the "to" column
+                if "to" in dapp_df.columns:
+                    # delete the decimal numbers in the to-address: also a bug in old version 
+                    dapp_df["to"] = dapp_df["to"].str.replace(r'^\d+$', '', regex=True)
+
+
             save_preprocessed_file(dapp_df, dapp_path, format_type)
 
             #store each DataFrame with a specific variable name dynamically after processing, for further data handling
@@ -282,18 +289,22 @@ def preprocess(format_type, trace_tree_path, events_dapp_path, value_calls_dapp_
     combined_df = combined_df.sort_values(["time:timestamp", "transactionIndex", "tracePos"])
     
     # combine the "address" and "to" columns into a new column "Address_o" (object)
-    combined_df["Address_o"] = combined_df["to"].combine_first(combined_df["address"])
+    combined_df["Address_o"] = combined_df["address"].combine_first(combined_df["to"]) # erst combined_df["to"].combine_first(combined_df["address"])
+    #just for checking the step: #save_preprocessed_file(combined_df, os.path.join(folder_path,'df_combinded_' + contract_file_name), format_type)
+    
+    # get the address types for the addresses of both coloumns, excluding NaN values
+    address_set = set(combined_df["Address_o"].dropna()).union(set(combined_df["from"].dropna()))
+    address_type_map = get_address_types(address_set, node_url, folder_path, contract_file_name)
 
-    # adds a coloumn address_types to determine if the address is a smart contract or an externally owned account (EOA)
-    address_type_map = get_address_types(combined_df["Address_o"], node_url, folder_path, contract_file_name)
+    # adds a coloumn address_types to determine if the address(include to addresses) is a smart contract or an externally owned account (EOA)
     # map the address to the address type from the dictionary
     combined_df["Address_Type"] = combined_df["Address_o"].map(address_type_map) 
 
-    # adds a coloumn address_types to determine if the from-address is a smart contract or an externally owned account (EOA)
-    address_type_map = get_address_types(combined_df["from"], node_url, folder_path, contract_file_name)
+    # adds a coloumn from_Type to determine if the from-address is a smart contract or an externally owned account (EOA)
+    #address_type_map = get_address_types(combined_df["from"], node_url, folder_path, contract_file_name)
     combined_df["from_Type"] = combined_df["from"].map(address_type_map)
     
-    # for from object
+    # from object
     combined_df["from_o"] = combined_df["from"]
 
     save_preprocessed_file(combined_df, os.path.join(folder_path,'df_combinded_' + contract_file_name), format_type)

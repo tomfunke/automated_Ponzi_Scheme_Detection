@@ -176,7 +176,7 @@ def input_output_flow(ocel, filename_without_extension, folder_path):
     return address_balance
 
 
-def check_ponzi_criteria(ocel, filename_without_extension, folder_path, node_url):
+def check_ponzi_criteria(ocel, filename_without_extension, folder_path, node_url, likehood_threshold):
     print("Start checking Ponzi criteria:")
     # firstly check the ponzi if he is a contract or an EOA: extractor gives just trace tree output, when trying to extract a EOA address without creation
 
@@ -201,7 +201,7 @@ def check_ponzi_criteria(ocel, filename_without_extension, folder_path, node_url
     main_smart_contract = filename_without_extension.split('_')[0]
     print("Main smart contract:", main_smart_contract)
     #TODO als main address eher sc_address aus input_output_flow nehmen, welche die meisten ether erhalten hat
-    which_token = ethereumnode.check_if_address_is_a_token(main_smart_contract, node_url)
+    which_token = ethereumnode.check_if_address_is_a_token(main_smart_contract, node_url, likehood_threshold)
     print("address is ",which_token)
 
     """

@@ -56,3 +56,29 @@ def open_address_file(folder_path, contract_file_name):
     print("Successfully read the list_address_type from the file")
     return address_dict
 
+def save_preprocessed_file(df, file_path, format_type):
+    # Save the preprocessed DataFrame to a new File
+
+    # Construct the new file path based on the presence of the format_type in the original file path
+    if format_type in file_path:
+        preprocessed_path = file_path.replace(format_type, f'_preprocessed{format_type}')
+    else:
+        preprocessed_path = file_path + f'_preprocessed{format_type}'
+    
+    # Save the DataFrame to the appropriate file format
+    if format_type == ".csv":
+        df.to_csv(preprocessed_path, index=False)
+    elif format_type == ".pkl":
+        df.to_pickle(preprocessed_path)
+
+def read_input_file(input_csv_file_path, format_type):
+    # Read the CSV or pickle file into a pandas DataFrame
+    if format_type == ".csv":
+        df = pd.read_csv(input_csv_file_path+format_type, low_memory=False)
+    elif format_type == ".pkl":
+        df = pd.read_pickle(input_csv_file_path+format_type) #for pickle files
+    else:
+        raise ValueError("The input file format is not supported")
+    
+    return df
+

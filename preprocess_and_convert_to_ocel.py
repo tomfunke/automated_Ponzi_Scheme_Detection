@@ -3,6 +3,8 @@ import pandas as pd
 import numpy as np
 import os
 import ethereumnode
+import re
+import helper
 
 def convert_df_coloumns(df):
     # add a column "name" if it does not exist -> necessary for process mining
@@ -23,31 +25,6 @@ def convert_df_coloumns(df):
 
     return df
 
-def save_preprocessed_file(df, file_path, format_type):
-    # Save the preprocessed DataFrame to a new File
-
-    # Construct the new file path based on the presence of the format_type in the original file path
-    if format_type in file_path:
-        preprocessed_path = file_path.replace(format_type, f'_preprocessed{format_type}')
-    else:
-        preprocessed_path = file_path + f'_preprocessed{format_type}'
-    
-    # Save the DataFrame to the appropriate file format
-    if format_type == ".csv":
-        df.to_csv(preprocessed_path, index=False)
-    elif format_type == ".pkl":
-        df.to_pickle(preprocessed_path)
-
-def read_input_file(input_csv_file_path, format_type):
-    # Read the CSV or pickle file into a pandas DataFrame
-    if format_type == ".csv":
-        df = pd.read_csv(input_csv_file_path+format_type, low_memory=False)
-    elif format_type == ".pkl":
-        df = pd.read_pickle(input_csv_file_path+format_type) #for pickle files
-    else:
-        raise ValueError("The input file format is not supported")
-    
-    return df
 
 def revert_txs(df):
     """
@@ -79,7 +56,7 @@ def revert_txs(df):
 
 def convert_events_dapp_to_ocel(format_type, file_path, object_selection):
     #legacy
-    df = read_input_file(file_path, format_type)
+    df = helper.read_input_file(file_path, format_type)
     df = convert_df_coloumns(df)
 
     # Creates a list of all columns that are additional for the OCEL as event attributes: All Coloumns - the chosen object - the standard columns time and activity
@@ -91,13 +68,13 @@ def convert_events_dapp_to_ocel(format_type, file_path, object_selection):
     #converts the dataframe to ocel format with the given object types: https://pm4py.fit.fraunhofer.de/static/assets/api/2.7.8/generated/pm4py.convert.convert_log_to_ocel.html
     ocel = pm4py.convert_log_to_ocel(df, object_types=object_selection, additional_event_attributes = remaining_attributes)
 
-    save_preprocessed_file(df, file_path, format_type)
+    helper.save_preprocessed_file(df, file_path, format_type)
     
     return ocel
 
 def convert_call_dapp_to_ocel(format_type, file_path, object_selection):
     #legacy
-    df = read_input_file(file_path, format_type)
+    df = helper.read_input_file(file_path, format_type)
     # Remove rows where 'name' is None or ''
     # This is necessary because the OCEL importer does not accept empty activity names: so effectively, we are removing every Error like out of gas
     #df = df[df['name'].notna() & (df['name'] != '')]
@@ -116,7 +93,7 @@ def convert_call_dapp_to_ocel(format_type, file_path, object_selection):
     #converts the dataframe to ocel format with the given object types
     #ocel = pm4py.convert_log_to_ocel(df, object_types=object_selection, additional_event_attributes = remaining_attributes)
 
-    save_preprocessed_file(df, file_path, format_type)
+    helper.save_preprocessed_file(df, file_path, format_type)
     
     #return ocel
 
@@ -215,7 +192,7 @@ def preprocess(format_type, trace_tree_path, events_dapp_path, value_calls_dapp_
     ##### TRACE TREE #####
     # just for finding the error txs
     # Read the input tracetree file
-    tracetree = read_input_file(trace_tree_path, format_type)
+    tracetree = helper.read_input_file(trace_tree_path, format_type)
     
     # create a set of all transactions that are associated with an error
     set_of_txs_to_revert = create_a_set_of_error_txs(tracetree)
@@ -237,7 +214,7 @@ def preprocess(format_type, trace_tree_path, events_dapp_path, value_calls_dapp_
 
     # Iterate over each file to preprocess
     for dapp_path, dapp_name in dapp_list:
-        dapp_df = read_input_file(dapp_path, format_type)
+        dapp_df = helper.read_input_file(dapp_path, format_type)
 
         # Check if the DataFrame is empty or contains only zero values
         if dapp_df.empty or (dapp_df == 0).all().all():
@@ -261,11 +238,11 @@ def preprocess(format_type, trace_tree_path, events_dapp_path, value_calls_dapp_
 
                 # Check if the "to" column exists before applying the replacement because not all Dapps have the "to" column
                 if "to" in dapp_df.columns:
-                    # delete the decimal numbers in the to-address: also a bug in old version 
-                    dapp_df["to"] = dapp_df["to"].str.replace(r'^\d+$', '', regex=True)
+                    # delete the decimal numbers in the to-address: also a bug in old version, but only if not NaN and string
+                    dapp_df["to"] = dapp_df["to"].apply(lambda x: re.sub(r'^\d+$', '', x) if pd.notna(x) and isinstance(x, str) else x)
 
 
-            save_preprocessed_file(dapp_df, dapp_path, format_type)
+            helper.save_preprocessed_file(dapp_df, dapp_path, format_type)
 
             #store each DataFrame with a specific variable name dynamically after processing, for further data handling
             dataframes[dapp_name] = dapp_df
@@ -280,6 +257,9 @@ def preprocess(format_type, trace_tree_path, events_dapp_path, value_calls_dapp_
     # combines all dataframes in the dictionary dataframes if they are not None /empty
     combined_df = pd.concat([df for df in dataframes.values() if df is not None])
     combined_df = combined_df.reset_index(drop=True) # reset the index, which will assign a new, unique index to each row
+    
+    # Convert the column to numeric, coercing errors to NaN (if any non-numeric values)
+    combined_df['callvalue'] = pd.to_numeric(combined_df['callvalue'], errors='coerce')
 
 
     # sort by timestamp (timestamp of the block), transaction index (order in block) and trace position (order in transaction)
@@ -289,8 +269,8 @@ def preprocess(format_type, trace_tree_path, events_dapp_path, value_calls_dapp_
     combined_df = combined_df.sort_values(["time:timestamp", "transactionIndex", "tracePos"])
     
     # combine the "address" and "to" columns into a new column "Address_o" (object)
-    combined_df["Address_o"] = combined_df["address"].combine_first(combined_df["to"]) # erst combined_df["to"].combine_first(combined_df["address"])
-    #just for checking the step: #save_preprocessed_file(combined_df, os.path.join(folder_path,'df_combinded_' + contract_file_name), format_type)
+    combined_df["Address_o"] = combined_df["address"].combine_first(combined_df["to"]) # erste implementiert war andersrum: combined_df["to"].combine_first(combined_df["address"])
+    #just for checking the step: #helper.save_preprocessed_file(combined_df, os.path.join(folder_path,'df_combinded_' + contract_file_name), format_type)
     
     # get the address types for the addresses of both coloumns, excluding NaN values
     address_set = set(combined_df["Address_o"].dropna()).union(set(combined_df["from"].dropna()))
@@ -307,7 +287,7 @@ def preprocess(format_type, trace_tree_path, events_dapp_path, value_calls_dapp_
     # from object
     combined_df["from_o"] = combined_df["from"]
 
-    save_preprocessed_file(combined_df, os.path.join(folder_path,'df_combinded_' + contract_file_name), format_type)
+    helper.save_preprocessed_file(combined_df, os.path.join(folder_path,'df_combinded_' + contract_file_name), format_type)
     print("preprocess done")
 
     """
@@ -327,7 +307,7 @@ def preprocess(format_type, trace_tree_path, events_dapp_path, value_calls_dapp_
     main_coloumns = np.array(['concept:name', 'time:timestamp']+object_selection)
     remaining_attributes = np.setdiff1d(combined_df.columns.to_numpy(), main_coloumns) # remaining = all - main
 
-    #Ocel with or without addtional object attributes:
+    #actual Ocel converting
     ocel = pm4py.convert_log_to_ocel(combined_df, object_types = object_selection, additional_object_attributes = object_attributes, additional_event_attributes = remaining_attributes)
     #ocel = pm4py.convert_log_to_ocel(combined_df, object_types = object_selection, additional_event_attributes = remaining_attributes)
     

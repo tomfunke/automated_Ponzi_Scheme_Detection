@@ -55,7 +55,7 @@ def check_if_address_is_sc_or_eoa(address, w3):
     return address_type
 
 
-def check_if_address_is_a_token(address, node_url):
+def check_if_address_is_a_token(address, node_url, likehood_threshold):
     # Connection
     w3 = check_if_connection_is_established(node_url)
 
@@ -99,6 +99,7 @@ def check_if_address_is_a_token(address, node_url):
                 matches += 1
             except:
                 # Function doesn't exist
+                print(f"Function {sig} not found")
                 pass
         results[standard] = matches / len(signatures)
 
@@ -106,7 +107,7 @@ def check_if_address_is_a_token(address, node_url):
 # Determine the most likely standard
     most_likely = max(results, key=results.get)
     print(results)
-    if results[most_likely] >= 0.6666:  # If more than 66.66% of functions are present
+    if results[most_likely] >= likehood_threshold:  # If more than 66.66% of functions are present
         return f"Likely {most_likely} token"
     else:
         return "likely NOT a standard token contract"

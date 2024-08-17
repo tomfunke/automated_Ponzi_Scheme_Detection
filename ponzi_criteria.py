@@ -7,7 +7,7 @@ from pm4py.visualization.bpmn import visualizer as bpmn_visualizer
 from pm4py.objects.conversion.bpmn import converter as bpmn_converter
 from pm4py.visualization.petri_net import visualizer as pn_visualizer
 from pm4py.objects.petri_net.exporter import exporter as pnml_exporter
-from collections import defaultdict
+from collections import defaultdict, Counter
 from pm4py.objects.ocel.util import flattening as ocel_flattening
 import helper
 import ethereumnode
@@ -108,7 +108,7 @@ def load_bpmn_petri(filename_without_extension):
 
     return net, initial_marking, final_marking
 
-def input_output_flow(ocel, filename_without_extension, folder_path):
+def input_output_flow(ocel, filename_without_extension, folder_path, node_url, likehood_threshold):
     # Step 2: Extract relevant events and attributes
     events = ocel.events
     objects = ocel.objects
@@ -158,19 +158,108 @@ def input_output_flow(ocel, filename_without_extension, folder_path):
     # The SC is the address that receives the most ether from the users.
     sc_address = max(address_balance, key=lambda x: address_balance[x]["received"])
     print(f"The smart contract address is: {sc_address}")
-    #TODO check if sc_address is a TOKEN
+    #TODO double check by checking if its a EOA
+
+    #which_token = ethereumnode.check_if_address_is_a_token(sc_address, node_url, likehood_threshold)
+    #print("address is ",which_token)
 
     # Addresses with no incoming transactions to the SC are considered to be the first users in the Ponzi scheme. They should have no first_transaction timestamp.
-    first_users = [address for address in address_balance if address_balance[address]["invested"] == 0]
-    print(f"The first users in the Ponzi scheme are: {first_users}")
+    users_with_no_input = [address for address in address_balance if address_balance[address]["invested"] == 0]
+    #print(f"The first users in the Ponzi scheme are: {users_with_no_input}")
+
+    #R1
+    # calculate how many users of all users have no incoming transactions to the SC
+    number_of_users_with_no_input = len(users_with_no_input)
+    total_number_of_users = len(address_balance)
+    percentage_of_users_with_no_input = number_of_users_with_no_input / total_number_of_users
+    print(f"The percentage of users without input is : {percentage_of_users_with_no_input:.2f}")
+    if percentage_of_users_with_no_input > likehood_threshold:
+        # Rules out -> no ponzi
+        print("The percentage of users without input is higher than the threshold of 66.66%. This means most ofthe users in this Contract are receiving ether from the SC. This is a strong indicator that this Contract is NOT a Ponzi scheme. ")
+        # like a exchange with an address for inputs and an address for outputs. logic is not visible (R1)
+        # so there logic that the addresess invested is likely on a centralized exchange
+    else:
+        # could be Ponzi if more requirements are met
+        print("Most addresses also sending ether to the SC. This is a first indicator that this Contract COULD be Ponzi scheme.")
+
 
     # calculate the profit of each user except the main SC
     # The profit of a user is the ether received minus the ether invested.
     user_profits = {address: address_balance[address]["received"] - address_balance[address]["invested"] for address in address_balance if address != sc_address}
     #TODO profit timestamp einbauen
+
+    # median profit except the SC
+    median_profit = sorted(user_profits.values())[len(user_profits) // 2]
+    print(f"The median profit of users is: {median_profit:.2f}")
     
+    
+
+    # Zusatz Wie oft welche Summe vorkommt
+    # check if users invest the same in most cases
+    # check with which frequency the users invest the same amount of ether
+   
+    # Extract the "invested" amounts from the defaultdict, excluding zero values
+    invested_amounts = [details["invested"] for details in address_balance.values() if details["invested"] != 0]
+
+    # Count the frequency of each invested amount using Counter
+    frequency = Counter(invested_amounts)
+
+    # Identify the top 5 most frequent invested amounts
+    top_5 = frequency.most_common(5)
+
+    # Calculate the total occurrences of the top 5 amounts
+    top_5_sum = sum(count for amount, count in top_5)
+
+    # Calculate the total number of all non-zero invested occurrences
+    total_sum = sum(frequency.values())
+
+    # Calculate the percentage of the top 5 frequencies relative to the total
+    top_5_percentage = (top_5_sum / total_sum)
+
+    # Print the results
+    print(f"Top 5 frequencies: {top_5}")
+    print(f"Total occurrences of top 5: {top_5_sum}")
+    print(f"Total non-zero invested occurrences: {total_sum}")
+    print(f"Top 5 frequencies as a percentage of total: {top_5_percentage:.2f}")
+    
+    if top_5_percentage > likehood_threshold:
+        print("The top 5 frequencies of invested amounts account for more than 66.66% of all non-zero invested occurrences. This is a strong indicator that this Contract is a Ponzi scheme because its a implemented logic.")
+        # mostly the same amount invested, could be Ponzi if more requirements are met
+    else:
+        print("Frequency is different")
+        # 
+
+
+
+    #R2: only investors
+    # check if the SC has an external investor (who has invested the most by far)
+    # The user who has invested the most ether (and is not the SC) and did not make profit is considered to be the external investor. & did not joined as last.
+    user_most_invested = max(
+    (address for address in address_balance if address != sc_address),
+    key=lambda x: address_balance[x]["invested"])
+    print(f"The user who invested the most ether is: {user_most_invested}")
+    # profit of the user who invested the most
+    profit_of_user_most_invested = user_profits[user_most_invested]
+    print(f"The profit (investment) is : {profit_of_user_most_invested}")
+    
+
+
+    #R1+R2
+    # calculate how many users have a profit greater than 0
+    profitable_users = [address for address in user_profits if user_profits[address] > 0]
+    number_of_profitable_users = len(profitable_users)
+    percentage_of_profitable_users = number_of_profitable_users / total_number_of_users
+    print(f"The percentage of profitable users is: {percentage_of_profitable_users:.2f}")
+    if percentage_of_profitable_users > likehood_threshold:
+        print("The percentage of profitable users is higher than the threshold of 66.66%. This means most of the users in this Contract are making a profit. This is a strong indicator that this Contract is NOT a Ponzi scheme. ")
+        # mostly profitable addresses/users which kicks SEC (R1+R2)
+        # or in a early phase of Ponzi where almost all like in chain win?
+    else:
+        print("Most users are not profitable. This is a first indicator that this Contract COULD be Ponzi scheme.")
+
+
     #TODO check mittels helper datei ob addresse eoa oder sc ist
-    address_dict = helper.open_address_file(folder_path, filename_without_extension)
+    #address_dict = helper.open_address_file(folder_path, filename_without_extension)
     #print(address_dict["0xfffc07f1b5f1d6bd365aa1dbc9d16b1777f406a2"])
 
     return address_balance
@@ -195,14 +284,18 @@ def check_ponzi_criteria(ocel, filename_without_extension, folder_path, node_url
     events_df = ocel.events #ocel.events returns a Pandas DataFrame
     #print(ocel.objects)
 
-    input_output_flow(ocel, filename_without_extension, folder_path)
+    input_output_flow(ocel, filename_without_extension, folder_path, node_url, likehood_threshold)
     
+
+    """
     #check if token functions implemented 
     main_smart_contract = filename_without_extension.split('_')[0]
     print("Main smart contract:", main_smart_contract)
     #TODO als main address eher sc_address aus input_output_flow nehmen, welche die meisten ether erhalten hat
     which_token = ethereumnode.check_if_address_is_a_token(main_smart_contract, node_url, likehood_threshold)
     print("address is ",which_token)
+    """
+
 
     """
     my own BPMN

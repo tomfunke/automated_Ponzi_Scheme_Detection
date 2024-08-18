@@ -11,6 +11,8 @@ from collections import defaultdict, Counter
 from pm4py.objects.ocel.util import flattening as ocel_flattening
 import helper
 import ethereumnode
+from pandas import Timestamp
+import numpy as np
 """
 Auf forsage activites bezogen
 
@@ -115,6 +117,10 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     
     # Step 3: Process the data
     address_balance = defaultdict(lambda: {"received": 0, "invested": 0, "first_transaction": None, "interaction_as_sender": 0, "interaction_as_receiver": 0})
+    
+    # get last timestamp of the events
+    last_timestamp = events["ocel:timestamp"].max()
+    print("Last timestamp:", last_timestamp)
 
     def update_balance(from_addr, to_addr, value):
         if from_addr:
@@ -124,7 +130,7 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
             address_balance[to_addr]["received"] += value
             address_balance[to_addr]["interaction_as_receiver"] += 1
     
-    first_investment = {}
+
     for _, row in events.iterrows():
         if row["callvalue"] > 0:
             update_balance(row["from"], row["to"], row["callvalue"]) # Update the balance for the sender and receiver interacting with the contract
@@ -132,13 +138,10 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
             # Check the timestamp of the first investment for each user = first transaction as sender (from)
             user = row["from"]
             timestamp = row["ocel:timestamp"]
-            if user not in first_investment:
-                first_investment[user] = timestamp
+            if address_balance[user]["first_transaction"] == None:
                 address_balance[user]["first_transaction"] = timestamp
-            else:
-                first_investment[user] = min(first_investment[user], timestamp)
-                address_balance[user]["first_transaction"] = timestamp
-            
+
+     
 
     
     # Convert wei to ether
@@ -175,7 +178,7 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     print(f"The percentage of users without input is : {percentage_of_users_with_no_input:.2f}")
     if percentage_of_users_with_no_input > likehood_threshold:
         # Rules out -> no ponzi
-        print("The percentage of users without input is higher than the threshold of 66.66%. This means most ofthe users in this Contract are receiving ether from the SC. This is a strong indicator that this Contract is NOT a Ponzi scheme. ")
+        print("The percentage of users without input is higher than the threshold of 66.66%. This means most ofthe users in this Contract are receiving ether from the SC. This is a strong indicator that this Contract is NOT a Ponzi scheme. And that the logic is external ")
         # like a exchange with an address for inputs and an address for outputs. logic is not visible (R1)
         # so there logic that the addresess invested is likely on a centralized exchange
     else:
@@ -226,12 +229,12 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
         print("The top 5 frequencies of invested amounts account for more than 66.66% of all non-zero invested occurrences. This is a strong indicator that this Contract is a Ponzi scheme because its a implemented logic.")
         # mostly the same amount invested, could be Ponzi if more requirements are met
     else:
-        print("Frequency is different")
+        print("sums are different")
         # 
 
 
 
-    #R2: only investors
+        #R2: only investors
     # check if the SC has an external investor (who has invested the most by far)
     # The user who has invested the most ether (and is not the SC) and did not make profit is considered to be the external investor. & did not joined as last.
     user_most_invested = max(
@@ -240,11 +243,23 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     print(f"The user who invested the most ether is: {user_most_invested}")
     # profit of the user who invested the most
     profit_of_user_most_invested = user_profits[user_most_invested]
-    print(f"The profit (investment) is : {profit_of_user_most_invested}")
+    print(f"The profit (investment if negativ) is : {profit_of_user_most_invested}")
+    timestamp_of_user_most_invested = address_balance[user_most_invested]["first_transaction"]
+    print(f"The timestamp of the first transaction of the user who invested the most ether is: {timestamp_of_user_most_invested}")
+    if last_timestamp == timestamp_of_user_most_invested and profit_of_user_most_invested < 0:
+        # handover scheme -> Ponzi
+        print("The last timestamp is equal to the timestamp of the user who invested the most ether and this big investor loses money. This could be a strong indicator that this Contract is a Ponzi scheme.")
+    elif last_timestamp != timestamp_of_user_most_invested and profit_of_user_most_invested < 0:
+        # Rules out R2-> no ponzi
+        print(" Could be an external source which pays off with own funds")
+    else: # big investor also makes profit
+        # could also be Ponzi if more requirements are met
+        print("Cant say anything about the contract")
+    #TODO check whether this address is a sc?
     
 
 
-    #R1+R2
+    # zusatz?
     # calculate how many users have a profit greater than 0
     profitable_users = [address for address in user_profits if user_profits[address] > 0]
     number_of_profitable_users = len(profitable_users)
@@ -252,10 +267,39 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     print(f"The percentage of profitable users is: {percentage_of_profitable_users:.2f}")
     if percentage_of_profitable_users > likehood_threshold:
         print("The percentage of profitable users is higher than the threshold of 66.66%. This means most of the users in this Contract are making a profit. This is a strong indicator that this Contract is NOT a Ponzi scheme. ")
-        # mostly profitable addresses/users which kicks SEC (R1+R2)
+        # mostly profitable addresses/users
         # or in a early phase of Ponzi where almost all like in chain win?
     else:
         print("Most users are not profitable. This is a first indicator that this Contract COULD be Ponzi scheme.")
+
+
+    #R3
+    # each investor makes profit if he is not the last investor/ new investors send ether to the SC after his investment
+    # unlucky gamers in casino should still lose money -> rules out R3
+
+
+    #R4
+    # Probability of losing money grows with the time of joining the scheme later
+    unprofitable_users = [address for address in user_profits if user_profits[address] < 0]
+    even_profit_users = [address for address in user_profits if user_profits[address] == 0]
+
+
+    print(type(address_balance["0x4aaa7083535965d1cdd44d1407dcb11eec3f576d"]["first_transaction"]))
+    # Extract all the timestamps
+    timestamps = [value['first_transaction'] for value in address_balance.values()]
+    print(address_balance["0x4aaa7083535965d1cdd44d1407dcb11eec3f576d"]["first_transaction"] > address_balance["0xee0e5160cc1d236ddd23c9340d1d687799100cb2"]["first_transaction"])
+    print(address_balance["0x4aaa7083535965d1cdd44d1407dcb11eec3f576d"]["first_transaction"] - address_balance["0xee0e5160cc1d236ddd23c9340d1d687799100cb2"]["first_transaction"])
+    print(address_balance["0x4aaa7083535965d1cdd44d1407dcb11eec3f576d"]["first_transaction"].isoformat())
+
+    """
+    # calculate the average timestamp of the first transaction for unprofitable users
+    average_timestamp_unprofitable = sum(address_balance[address]["first_transaction"] for address in unprofitable_users) / len(unprofitable_users)
+    print(f"The average timestamp of the first transaction for unprofitable users is: {average_timestamp_unprofitable}")
+    # calculate the average timestamp of the first transaction for profitable_users 
+    average_timestamp_profitable_users = sum(address_balance[address]["first_transaction"] for address in profitable_users) / len(profitable_users)
+    """
+
+
 
 
     #TODO check mittels helper datei ob addresse eoa oder sc ist

@@ -58,7 +58,7 @@ def main():
 
     # Set the paths for faster testing:
     # Path to log folder
-    input_folder_path = "/Users/tomfunke/Desktop/logging/locale_extraktion/inklusive_nondapp/coinbase_contract"
+    input_folder_path = "/Users/tomfunke/Desktop/logging/locale_extraktion/inklusive_nondapp/forsage_50k_ohne45e"
     #"/Users/tomfunke/Desktop/logging/locale_extraktion/inklusive_nondapp/coinbase_contract"
     #"/Users/tomfunke/Desktop/logging/locale_extraktion/inklusive_nondapp/chickenhunt"
     #"/Users/tomfunke/Desktop/logging/locale_extraktion/inklusive_nondapp/yacht"
@@ -71,7 +71,7 @@ def main():
     
     # Just the name without the prefix and suffix (main contract_address with range withour file format)
     # example: "0x9758da9b4d001ed2d0df46d25069edf53750767a_1335983_1497934"
-    input_contract_file_name = "0xa9d1e08c7793af67e9d92fe308d5697fb81d3e43_15148951_15204321"
+    input_contract_file_name = "0x5acc84a3e955bdd76467d3348077d003f00ffb97_9391396_9441396"
     #"0xa9d1e08c7793af67e9d92fe308d5697fb81d3e43_15148951_15204321"# coinbase
     #"0x1ed3d2c916cab00631cce4b08a7f880d4badae94_5851509_5954321" #chickenhunt
     #"0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d_12287507_12354321"

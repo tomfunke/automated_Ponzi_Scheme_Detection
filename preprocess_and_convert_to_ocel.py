@@ -236,10 +236,15 @@ def preprocess(format_type, trace_tree_path, events_dapp_path, value_calls_dapp_
                 # convert the address to lowercase: in a old version of the extractor the address was not converted to lowercase
                 dapp_df["address"] = dapp_df["address"].str.lower()
 
+                # Datacleaning for from and to column if there are events with special attributes
                 # Check if the "to" column exists before applying the replacement because not all Dapps have the "to" column
+                # example https://etherscan.io/tx/0x4b0a9a2956a103e0fbcda0b21dbdac046cb6fd09ddd792db760873334898e660#eventlog
                 if "to" in dapp_df.columns:
-                    # delete the decimal numbers in the to-address: also a bug in old version, but only if not NaN and string
+                    # delete the decimal numbers in the to-address, but only if not NaN and string. 
                     dapp_df["to"] = dapp_df["to"].apply(lambda x: re.sub(r'^\d+$', '', x) if pd.notna(x) and isinstance(x, str) else x)
+                if "from" in dapp_df.columns:
+                    # delete the decimal numbers in the from-address, but only if not NaN and string. 
+                    dapp_df["from"] = dapp_df["from"].apply(lambda x: re.sub(r'^\d+$', '', x) if pd.notna(x) and isinstance(x, str) else x)
 
 
             helper.save_preprocessed_file(dapp_df, dapp_path, format_type)
@@ -308,6 +313,7 @@ def preprocess(format_type, trace_tree_path, events_dapp_path, value_calls_dapp_
     remaining_attributes = np.setdiff1d(combined_df.columns.to_numpy(), main_coloumns) # remaining = all - main
 
     #actual Ocel converting
+    # https://processintelligence.solutions/static/api/2.7.11/pm4py.html#pm4py.convert.convert_log_to_ocel
     ocel = pm4py.convert_log_to_ocel(combined_df, object_types = object_selection, additional_object_attributes = object_attributes, additional_event_attributes = remaining_attributes)
     #ocel = pm4py.convert_log_to_ocel(combined_df, object_types = object_selection, additional_event_attributes = remaining_attributes)
     

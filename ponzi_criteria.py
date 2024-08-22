@@ -122,6 +122,9 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     last_timestamp = events["ocel:timestamp"].max()
     print("Last timestamp:", last_timestamp)
 
+    # get the SC address
+    sc_input = helper.get_contract_address_from_blockrange_name(filename_without_extension)
+
     def update_balance(from_addr, to_addr, value):
         if from_addr:
             address_balance[from_addr]["invested"] += value
@@ -130,8 +133,16 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
             address_balance[to_addr]["received"] += value
             address_balance[to_addr]["interaction_as_receiver"] += 1
     
+    # count the different paths of the transactions
+    count_paths = {"initial_investment_to_Sc_by_EOA": 0,
+                   "Sc_sends_to_another_user_in_same_transaction": 0,
+                   "Sc_sends_to_multiple_users_in_same_transaction": 0,
+                   "SC_does_nothing_in_same_transaction": 0,
+                     "Internal_Upgrade_Event": 0,
+                   }
 
-    for _, row in events.iterrows():
+    # iterate through the events
+    for i, row in events.iterrows():
         if row["callvalue"] > 0:
             update_balance(row["from"], row["to"], row["callvalue"]) # Update the balance for the sender and receiver interacting with the contract
 
@@ -140,7 +151,76 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
             timestamp = row["ocel:timestamp"]
             if address_balance[user]["first_transaction"] == None:
                 address_balance[user]["first_transaction"] = timestamp
+                
+                # this means its the initial investment of a user to the Dapp (user A initiates transaction)
+                # check if from_Typ is a contract or an EOA
+                if(row["from_Type"] == "EOA"): # so it cant be the Dapps first sending transaction
+                    print("Sender is a EOA: ", user)
+                    count_paths["initial_investment_to_Sc_by_EOA"] += 1
 
+                    # now check if same transaction has multiple transaction traces (tracePos)
+                    hash_of_this_tx = row["hash"]
+                    memory_of_this_hash = {"counter_how_often_sc_sends_to_others": 0,
+                                           "counter_how_often_internal_upgrade_event": 0}
+                    # Inner loop: Start from the current position of the outer loop and stop when hash changes. Instead of iterating through all transactions again, the inner loop starts from the current index (i) of the outer loop and iterates forward until it encounters a different hash.
+                    for j in range(i, len(events)):
+                        inner_row = events.iloc[j]
+                        if inner_row["hash"] != hash_of_this_tx:
+                            #events.iloc[j-1]# in some transactions its just this one step and nothing more happens; j-i is the original line before we break in thi j
+                            
+                            # Save memory stats before breaking inner loop
+                            # this does not give the number of internal events and how many times the SC sends to others in the same transaction. It just counts plus 1 for each kind of trace
+                            if memory_of_this_hash["counter_how_often_sc_sends_to_others"] == 0: #  means that the SC does not send to another user in the same transaction-> kann ich das benutzen als path ende?
+                                count_paths["SC_does_nothing_in_same_transaction"] += 1
+                        
+                            if memory_of_this_hash["counter_how_often_sc_sends_to_others"] == 1:
+                                count_paths["Sc_sends_to_another_user_in_same_transaction"] += 1
+                            
+                            if memory_of_this_hash["counter_how_often_sc_sends_to_others"] > 1:
+                                count_paths["Sc_sends_to_multiple_users_in_same_transaction"] += 1 
+
+                            if memory_of_this_hash["counter_how_often_internal_upgrade_event"] > 0:
+                                count_paths["Internal_Upgrade_Event"] += 1
+                            
+                            break  # Stop inner loop when the hash changes 
+
+                        # Process the transactions with the same hash with multiple tracePos
+                        print(f"Processing transaction with the same hash: {inner_row['hash']} in trace Pos: {inner_row['tracePos']}")
+                        
+                        # check if the SC sends to another user
+                        if inner_row["from"] == sc_input and inner_row["to"] != user:
+                            print("SC sends to another user in the same transaction")
+                            memory_of_this_hash["counter_how_often_sc_sends_to_others"] += 1
+                            
+                        
+                        # check if events
+                        if "address" in inner_row:
+                            if inner_row["address"] == sc_input:
+                                print("Internal Upgrade Event")
+                                memory_of_this_hash["counter_how_often_internal_upgrade_event"] += 1
+            
+            
+            
+            elif address_balance[user]["first_transaction"] != None:
+                if (row["from_Type"] == "EOA"):
+                    # not the first transaction of the user
+                    print("investor is multiple times investing: ", user)
+                    # TODO was passiert wenn ein user mehrmals investiert? -> wie wird das in der balance berücksichtigt?
+        
+        else: # no value in this transaction
+
+            # if callvalue is 0 and someone is sending to the SC means its a trigger from outside the SC
+            if(row["to"] == sc_input):
+                print("Someone triggers from outside the SC")
+                #TODO test if the SC sends to another user like in 0xa068bdda7b9f597e8a2eb874285ab6b864836cb8e48a1b6fccb0150bf44f5592
+                # same hash should have callvalue > 0 and from = SC and to = user
+    
+    # print initial_investment_to_Sc_by_EOA
+    print(count_paths)
+    # bedeuted es jetzt bei coinbase {'initial_investment_to_Sc_by_EOA': 156, 'Sc_sends_to_another_user_in_same_transaction': 0, 'Sc_sends_to_multiple_users_in_same_transaction': 0, 'SC_does_nothing_in_same_transaction': 156, 'Internal_Upgrade_Event': 0}
+    # wenn alles 0 ist, dass es kein Ponzi ist? die Überweisung endet halt nur vor erst hier. Kann ja durch 0 callvalue noch getriggert werden
+                        
+                        
      
 
     
@@ -161,7 +241,7 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     # The SC is the address that receives the most ether from the users.
     sc_address = max(address_balance, key=lambda x: address_balance[x]["received"])
     print(f"The smart contract address is: {sc_address}")
-    #TODO double check by checking if its a EOA
+    #TODO double check by checking if its a SC
 
     #which_token = ethereumnode.check_if_address_is_a_token(sc_address, node_url, likehood_threshold)
     #print("address is ",which_token)
@@ -283,7 +363,7 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     unprofitable_users = [address for address in user_profits if user_profits[address] < 0]
     even_profit_users = [address for address in user_profits if user_profits[address] == 0]
 
-
+    # Example forsage:
     print(type(address_balance["0x4aaa7083535965d1cdd44d1407dcb11eec3f576d"]["first_transaction"]))
     # Extract all the timestamps
     timestamps = [value['first_transaction'] for value in address_balance.values()]

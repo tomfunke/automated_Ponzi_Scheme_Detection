@@ -83,3 +83,7 @@ def read_input_file(input_csv_file_path, format_type):
     
     return df
 
+def get_contract_address_from_blockrange_name(file_name):
+    # Extract the contract address from the file name
+    contract_address = file_name.split('_')[0]
+    return contract_address

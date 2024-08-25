@@ -58,7 +58,8 @@ def main():
 
     # Set the paths for faster testing:
     # Path to log folder
-    input_folder_path = "/Users/tomfunke/Desktop/logging/locale_extraktion/inklusive_nondapp/ether_doubler"
+    input_folder_path = "/Users/tomfunke/Desktop/logging/locale_extraktion/inklusive_nondapp/coinbase_contract"
+    #"/Users/tomfunke/Desktop/logging/locale_extraktion/inklusive_nondapp/ether_doubler_without_deployer"
     #"/Users/tomfunke/Desktop/logging/locale_extraktion/inklusive_nondapp/coinbase_contract"
     #"/Users/tomfunke/Desktop/logging/locale_extraktion/inklusive_nondapp/chickenhunt"
     #"/Users/tomfunke/Desktop/logging/locale_extraktion/inklusive_nondapp/yacht"
@@ -71,7 +72,8 @@ def main():
     
     # Just the name without the prefix and suffix (main contract_address with range withour file format)
     # example: "0x9758da9b4d001ed2d0df46d25069edf53750767a_1335983_1497934"
-    input_contract_file_name = "0xfd2487cc0e5dce97f08be1bc8ef1dce8d5988b4d_1014288_12679208" #ether_doubler -> chain
+    input_contract_file_name = "0xa9d1e08c7793af67e9d92fe308d5697fb81d3e43_15148951_15204321"
+    #"0xfd2487cc0e5dce97f08be1bc8ef1dce8d5988b4d_1014288_12679208" #ether_doubler -> chain
     #"0xa9d1e08c7793af67e9d92fe308d5697fb81d3e43_15148951_15204321"# coinbase
     #"0x1ed3d2c916cab00631cce4b08a7f880d4badae94_5851509_5954321" #chickenhunt
     #"0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d_12287507_12354321"
@@ -98,6 +100,10 @@ def main():
     delegatecall_dapp_path = helper.check_if_file_exists(os.path.join(input_folder_path,'df_delegatecall_dapp_' + input_contract_file_name),format_type_trace_tree)
     value_calls_non_dapp_path = helper.check_if_file_exists(os.path.join(input_folder_path,'df_call_with_ether_transfer_non_dapp_' + input_contract_file_name),format_type_trace_tree)
     # was ist mit CREATIONS DAPP? enthält im "to" weitere contract addresses für objekte
+
+    #contracts_dapp_ .txt
+    contracts_dapp_ = helper.open_contracts_txt_file(input_folder_path, input_contract_file_name)
+    print(contracts_dapp_)
     print("pathing done")
 
     """

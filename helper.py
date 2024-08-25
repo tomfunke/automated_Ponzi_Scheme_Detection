@@ -3,6 +3,18 @@ import sys
 import json
 import pandas as pd
 
+def open_contracts_txt_file(folder_path, contract_file_name):
+    contracts_file_path = os.path.join(folder_path,'contracts_dapp_' + contract_file_name+'.txt')
+    if not os.path.isfile(contracts_file_path):
+        print("The contract_txt file does not exist.")
+        return None # falls die Datei nicht wichtiger wird. sonst sys.exit(1)
+    
+    with open(contracts_file_path, 'r') as file:
+        contracts = file.read().splitlines()
+        
+    #print("Successfully read the contracts from the file")
+    return contracts
+
 def check_which_formatType_exists(file_path):
     # Check for CSV and PKL files
     if os.path.exists(f"{file_path}.csv"):

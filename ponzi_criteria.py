@@ -1,6 +1,5 @@
 import pm4py
 import pandas as pd
-import networkx as nx
 from datetime import datetime
 from pm4py.objects.bpmn.importer import importer as bpmn_importer
 from pm4py.visualization.bpmn import visualizer as bpmn_visualizer
@@ -13,71 +12,9 @@ import helper
 import ethereumnode
 from pandas import Timestamp
 import numpy as np
-"""
-Auf forsage activites bezogen
+import matplotlib.pyplot as plt
+from datetime import datetime
 
-# Load the OCEL file
-def load_ocel(file_path):
-    df = pd.read_csv(file_path, sep='\t')
-    return df
-
-# Create a transaction graph
-def create_transaction_graph(df):
-    G = nx.DiGraph()
-    for _, row in df[df['ocel:activity'] == 'call and transfer ether'].iterrows():
-        G.add_edge(row['from'], row['to'], value=float(row['callvalue']))
-    return G
-
-# Analyze payout structure
-def analyze_payout_structure(df, G):
-    payouts = {}
-    for node in G.nodes():
-        in_value = sum([G.edges[edge]['value'] for edge in G.in_edges(node)])
-        out_value = sum([G.edges[edge]['value'] for edge in G.out_edges(node)])
-        payouts[node] = {'in': in_value, 'out': out_value, 'net': in_value - out_value}
-    return payouts
-
-# Analyze user growth
-def analyze_user_growth(df):
-    registrations = df[df['ocel:activity'] == 'Registration'].sort_values('ocel:timestamp')
-    registrations['cumulative_users'] = range(1, len(registrations) + 1)
-    return registrations
-
-# Analyze upgrade patterns
-def analyze_upgrades(df):
-    upgrades = df[df['ocel:activity'] == 'Upgrade'].sort_values('ocel:timestamp')
-    return upgrades
-
-# Main analysis function
-def analyze_potential_ponzi(file_path):
-    df = load_ocel(file_path)
-    G = create_transaction_graph(df)
-    
-    payouts = analyze_payout_structure(df, G)
-    user_growth = analyze_user_growth(df)
-    upgrades = analyze_upgrades(df)
-    
-    # Calculate some metrics
-    total_value = sum([payouts[node]['in'] for node in payouts])
-    top_receivers = sorted(payouts.items(), key=lambda x: x[1]['net'], reverse=True)[:10]
-    
-    print(f"Total value in system: {total_value}")
-    print("Top 10 net receivers:")
-    for address, values in top_receivers:
-        print(f"{address}: Net {values['net']}, In {values['in']}, Out {values['out']}")
-    
-    print(f"Total users: {len(user_growth)}")
-    print(f"Total upgrades: {len(upgrades)}")
-    
-    # You could add more sophisticated analysis here, such as:
-    # - Calculating the rate of user growth over time
-    # - Analyzing the time between registration and first payout
-    # - Checking for circular payment patterns
-    # - Analyzing the referral structure
-
-# Run the analysis
-#analyze_potential_ponzi('path_to_your_ocel_file.csv')
-"""
 
 def load_bpmn_petri(filename_without_extension):
     #bpmn testen
@@ -110,6 +47,58 @@ def load_bpmn_petri(filename_without_extension):
 
     return net, initial_marking, final_marking
 
+def plotting(timestamps_unprofit, losses, profits_profitable_with_timestamp, timestamps_profit, profits_even_profit, timestamps_even_profit, profits_profit_no_timestamp, timestamps_profit_no_timestamp, filename_without_extension):
+
+
+    # Create scatter plot
+    plt.figure(figsize=(10, 6))
+
+    if timestamps_unprofit:
+        plt.scatter(timestamps_unprofit, losses, color='red', label='Unprofitable Users')
+
+    # Plot profitable users in blue
+    if timestamps_profit:
+        plt.scatter(timestamps_profit, profits_profitable_with_timestamp, color='green', label='Profitable Users')
+
+    # Plot even profit users in green
+    if timestamps_even_profit:
+        plt.scatter(timestamps_even_profit, profits_even_profit, color='orange', label='Even Profit Users')
+
+    # Plot profitable users with no original timestamp in orange
+    if timestamps_profit_no_timestamp and profits_profit_no_timestamp:
+        plt.scatter(timestamps_profit_no_timestamp, profits_profit_no_timestamp, color='blue', label='Profit - No Original Timestamp')
+
+
+    # Add labels and title
+    plt.xlabel('Timestamp of First Investment')
+    plt.ylabel('Profit in Wei')
+    plt.title(f"Profit distribution of the smart contract \n {filename_without_extension}")
+
+    #Automatically Adjusting the X-Axis Limits
+    #plt.xlim([min(timestamps_unprofit + timestamps_profit), max(timestamps_unprofit + timestamps_profit)])
+
+    # Set the x-axis limits manually
+    #plt.xlim(pd.Timestamp('2016-02-16'), pd.Timestamp('2016-08-16')) # ether_doubler_without_deployer has outlier in 2018
+
+    # Format x-axis for better date readability
+    plt.gcf().autofmt_xdate()
+
+    # Show legend and grid
+    plt.legend()
+    plt.grid(True)
+
+
+    # Save the plot to a file
+    plt.savefig(f"output/users_profit_vs_timestamp_{filename_without_extension}.png")
+
+    # Display plot
+    #plt.show()
+
+    # Close the plot
+    plt.close()
+
+    return
+
 def input_output_flow(ocel, filename_without_extension, folder_path, node_url, likehood_threshold):
     # Step 2: Extract relevant events and attributes
     events = ocel.events
@@ -121,6 +110,7 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     # get last timestamp of the events
     last_timestamp = events["ocel:timestamp"].max()
     print("Last timestamp:", last_timestamp)
+    earliest_timestamp = events["ocel:timestamp"].min()
 
     # get the SC address
     sc_input = helper.get_contract_address_from_blockrange_name(filename_without_extension)
@@ -250,7 +240,7 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     users_with_no_input = [address for address in address_balance if address_balance[address]["invested"] == 0]
     #print(f"The first users in the Ponzi scheme are: {users_with_no_input}")
 
-    #R1
+    #R1 logic
     # calculate how many users of all users have no incoming transactions to the SC
     number_of_users_with_no_input = len(users_with_no_input)
     total_number_of_users = len(address_balance)
@@ -258,12 +248,12 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     print(f"The percentage of users without input is : {percentage_of_users_with_no_input:.2f}")
     if percentage_of_users_with_no_input > likehood_threshold:
         # Rules out -> no ponzi
-        print("The percentage of users without input is higher than the threshold of 66.66%. This means most ofthe users in this Contract are receiving ether from the SC. This is a strong indicator that this Contract is NOT a Ponzi scheme. And that the logic is external ")
+        print(f"The percentage of users without input is higher than the threshold of {likehood_threshold}. This means most of the users in this Contract are receiving ether from the SC. This is a strong indicator that this Contract is NOT a Ponzi scheme. And that the logic is external (R1)")
         # like a exchange with an address for inputs and an address for outputs. logic is not visible (R1)
         # so there logic that the addresess invested is likely on a centralized exchange
     else:
         # could be Ponzi if more requirements are met
-        print("Most addresses also sending ether to the SC. This is a first indicator that this Contract COULD be Ponzi scheme.")
+        print("Most addresses are sending ether to the SC. This is a first indicator that this Contract COULD be Ponzi scheme.(R1)")
 
 
     # calculate the profit of each user except the main SC
@@ -273,7 +263,8 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
 
     # median profit except the SC
     median_profit = sorted(user_profits.values())[len(user_profits) // 2]
-    print(f"The median profit of users is: {median_profit:.2f}")
+    median_profit_in_eth = wei_to_ether(median_profit)
+    print(f"The median profit of users is: {median_profit_in_eth} ETH")
     
     
 
@@ -306,7 +297,7 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     print(f"Top 5 frequencies as a percentage of total: {top_5_percentage:.2f}")
     
     if top_5_percentage > likehood_threshold:
-        print("The top 5 frequencies of invested amounts account for more than 66.66% of all non-zero invested occurrences. This is a strong indicator that this Contract is a Ponzi scheme because its a implemented logic.")
+        print(f"The top 5 frequencies of invested amounts account for more than {likehood_threshold} of all non-zero invested occurrences. This is a strong indicator that this Contract is a Ponzi scheme because its a implemented logic.")
         # mostly the same amount invested, could be Ponzi if more requirements are met
     else:
         print("sums are different")
@@ -323,18 +314,24 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     print(f"The user who invested the most ether is: {user_most_invested}")
     # profit of the user who invested the most
     profit_of_user_most_invested = user_profits[user_most_invested]
-    print(f"The profit (investment if negativ) is : {profit_of_user_most_invested}")
+    print(f"The profit (investment if negativ) of the user who invested the most is : {profit_of_user_most_invested}")
     timestamp_of_user_most_invested = address_balance[user_most_invested]["first_transaction"]
     print(f"The timestamp of the first transaction of the user who invested the most ether is: {timestamp_of_user_most_invested}")
     if last_timestamp == timestamp_of_user_most_invested and profit_of_user_most_invested < 0:
         # handover scheme -> Ponzi
-        print("The last timestamp is equal to the timestamp of the user who invested the most ether and this big investor loses money. This could be a strong indicator that this Contract is a Ponzi scheme.")
+        print("The last timestamp is equal to the timestamp of the user who invested the most ether and this big investor loses money. This could be a strong indicator that this Contract is a Ponzi scheme.(R2)")#Red
     elif last_timestamp != timestamp_of_user_most_invested and profit_of_user_most_invested < 0:
         # Rules out R2-> no ponzi
-        print(" Could be an external source which pays off with own funds")
+        # external investor makes a loss
+        print(" Could be an external source which pays off with own funds(R2)")
+        # How big is the loss? Vergleich von von input zu output?
+        if address_balance[user_most_invested]["received"] / address_balance[user_most_invested]["invested"] > likehood_threshold:
+            print("But this investor also gets a lot of ether back. perhaps not an external one after all  (R2)")#ORANGE
+        else:
+            print("Should be an external investor since he makes a loss and does not get much back (R2)")#Green
     else: # big investor also makes profit
         # could also be Ponzi if more requirements are met
-        print("Cant say anything about the contract")
+        print("Cant say anything about the contract(R2) since the biggest investor makes profit.")# Orange / neutral
     #TODO check whether this address is a sc?
     
 
@@ -360,9 +357,75 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
 
     #R4
     # Probability of losing money grows with the time of joining the scheme later
+    # bubble chart? scatter plot?
     unprofitable_users = [address for address in user_profits if user_profits[address] < 0]
     even_profit_users = [address for address in user_profits if user_profits[address] == 0]
+    
+    # Extract all the timestamps of the first transaction for unprofitable users
+    timestamps_unprofit = [address_balance[address]["first_transaction"] for address in unprofitable_users]
+    
+    # Convert each Timestamp to a Unix timestamp
+    unix_timestamps_unprofit = [int(ts.timestamp()) for ts in timestamps_unprofit]
 
+    # Calculate the average of the Unix timestamps
+    average_unix_timestamp = sum(unix_timestamps_unprofit) / len(unix_timestamps_unprofit)
+    # Convert the average Unix timestamp back to a Pandas Timestamp (humandreadable)
+    average_timestamp = pd.to_datetime(average_unix_timestamp, unit='s')
+
+    #print(f"The average Unix timestamp is: {average_unix_timestamp}")
+    print(f"The average timestamp of unprofitable users is: {average_timestamp}")
+
+    #average_timestamp_profitable_users müssen die None gefiltert werden. Sind profitbal ohne zu joinen?
+    # users_with_no_input sind schon in R1 definiert die user ohne Input/timestamp
+
+
+    # profit users which has timestamp. this means they invested once
+    prof_user_with_timestamp = [address for address in user_profits if user_profits[address] > 0 and address_balance[address]["first_transaction"] is not None]
+    if not prof_user_with_timestamp:
+        print("There are no profitable users with investment-timestamps. (R4) ") # Orange
+        # in scams should be at least one user who makes profit -> or its just the one without timestamp->hardcoded?
+        timestamps_profit = None # just for plotting
+    else:
+        # Extract all the timestamps of the first transaction for profitable users with timestamp
+        timestamps_profit = [address_balance[address]["first_transaction"] for address in prof_user_with_timestamp]
+        # Convert each Timestamp to a Unix timestamp
+        unix_timestamps_profit = [int(ts.timestamp()) for ts in timestamps_profit]
+        # Calculate the average of the Unix timestamps
+        average_unix_timestamp_profit = sum(unix_timestamps_profit) / len(unix_timestamps_profit)
+        # Convert the average Unix timestamp back to a Pandas Timestamp (humandreadable)
+        average_timestamp_profit = pd.to_datetime(average_unix_timestamp_profit, unit='s')
+        # Print the average timestamp of profitable users
+        print(f"The average timestamp of profitable users is: {average_timestamp_profit}")
+
+        # check if the average timestamp of unprofitable users is greater than the average timestamp of profitable users
+        if average_timestamp > average_timestamp_profit:
+            print("The average entry timestamp of unprofitable users is greater than the average entry timestamp of profitable users. Likely Ponzi. (R4)")#Red
+        else:
+            print("The average entry timestamp of unprofitable users is not greater than the average entry timestamp of profitable users. Likely not Ponzi. (R4)")#green
+    
+
+
+    ##### Caclucate Data for Plotting#####
+    # Extract data for plotting - Unprofitable users and profitable users with their invest/loss
+    # their timestamps are already extracted in R4
+    losses = [user_profits[address] for address in unprofitable_users]
+    profits_profitable_with_timestamp = [user_profits[address] for address in prof_user_with_timestamp]
+
+    # Extract data for plotting - Even profit users
+    timestamps_even_profit = [address_balance[address]["first_transaction"] for address in even_profit_users]
+    profits_even_profit = [user_profits[address] for address in even_profit_users]
+
+    # Extract data for plotting - Profitable users with no original timestamp
+    timestamps_profit_no_timestamp = [earliest_timestamp for address in users_with_no_input]# assign each user without timestamp with the earliest timestamp
+    profits_profit_no_timestamp = [user_profits[address] for address in users_with_no_input]
+
+    #Plotting R4
+    plotting(timestamps_unprofit, losses, profits_profitable_with_timestamp, timestamps_profit, profits_even_profit, timestamps_even_profit, profits_profit_no_timestamp, timestamps_profit_no_timestamp, filename_without_extension)
+
+
+
+
+    """
     # Example forsage:
     print(type(address_balance["0x4aaa7083535965d1cdd44d1407dcb11eec3f576d"]["first_transaction"]))
     # Extract all the timestamps
@@ -370,13 +433,6 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     print(address_balance["0x4aaa7083535965d1cdd44d1407dcb11eec3f576d"]["first_transaction"] > address_balance["0xee0e5160cc1d236ddd23c9340d1d687799100cb2"]["first_transaction"])
     print(address_balance["0x4aaa7083535965d1cdd44d1407dcb11eec3f576d"]["first_transaction"] - address_balance["0xee0e5160cc1d236ddd23c9340d1d687799100cb2"]["first_transaction"])
     print(address_balance["0x4aaa7083535965d1cdd44d1407dcb11eec3f576d"]["first_transaction"].isoformat())
-
-    """
-    # calculate the average timestamp of the first transaction for unprofitable users
-    average_timestamp_unprofitable = sum(address_balance[address]["first_transaction"] for address in unprofitable_users) / len(unprofitable_users)
-    print(f"The average timestamp of the first transaction for unprofitable users is: {average_timestamp_unprofitable}")
-    # calculate the average timestamp of the first transaction for profitable_users 
-    average_timestamp_profitable_users = sum(address_balance[address]["first_transaction"] for address in profitable_users) / len(profitable_users)
     """
 
 
@@ -394,19 +450,11 @@ def check_ponzi_criteria(ocel, filename_without_extension, folder_path, node_url
     # firstly check the ponzi if he is a contract or an EOA: extractor gives just trace tree output, when trying to extract a EOA address without creation
 
     """
-    # netwrokx testen:
-    G = pm4py.convert.convert_ocel_to_networkx(ocel)
-    #print(G)
-    edge_types = set(nx.get_edge_attributes(G, 'type').values())
-    #print("Edge types:", edge_types)
-    """
-
-    """
     It's important to note that while events_df is a Pandas DataFrame, it's a view into the OCEL data structure. 
     If you modify this DataFrame, you may need to update the OCEL object to reflect these changes, depending on what operations you're performing
-    """
     events_df = ocel.events #ocel.events returns a Pandas DataFrame
     #print(ocel.objects)
+    """
 
     input_output_flow(ocel, filename_without_extension, folder_path, node_url, likehood_threshold)
     

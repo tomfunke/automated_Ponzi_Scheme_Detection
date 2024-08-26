@@ -13,11 +13,14 @@ import ethereumnode
 from pandas import Timestamp
 import numpy as np
 import matplotlib.pyplot as plt
-from datetime import datetime
 
 
 def load_bpmn_petri(filename_without_extension):
-    #bpmn testen
+    """
+    bpmn to petri net
+    returns the petri net
+    """
+
     # Load the BPMN file
     bpmn_graph = bpmn_importer.apply("input/ponzi.bpmn")
     
@@ -46,6 +49,30 @@ def load_bpmn_petri(filename_without_extension):
     pnml_exporter.apply(net, initial_marking, f'output/saved_petri_net_{filename_without_extension}.pnml')
 
     return net, initial_marking, final_marking
+
+def alignments_calculations(ocel):
+    """"
+     Using our own BPMN as reference model
+     https://processintelligence.solutions/static/api/2.7.11/api.html#conformance-checking-pm4py-conformance
+     # does not work with our log since they mostly have the same activity name: "call and transfer"
+    """
+    # Load the BPMN file and convert it to a Petri net
+    net, initial_marking, final_marking = load_bpmn_petri("standard_ponzi")
+
+    # transform the ocel to a XES log
+    traditional_log = ocel_flattening.flatten(ocel, "ocel:type:Address_o") # gegebenenfalls noch from_o addresse als objekt
+    print(traditional_log)
+
+    #replayed_traces = pm4py.conformance_diagnostics_token_based_replay(traditional_log, net, initial_marking, final_marking)
+    #print(replayed_traces)
+
+    alignments_precision = pm4py.conformance.precision_alignments(traditional_log, net, initial_marking, final_marking)
+    print(alignments_precision)
+
+    alignments_fitness = pm4py.conformance.fitness_alignments(traditional_log, net, initial_marking, final_marking)
+    print(alignments_fitness)
+
+    return  alignments_precision,alignments_fitness
 
 def plotting(timestamps_unprofit, losses, profits_profitable_with_timestamp, timestamps_profit, profits_even_profit, timestamps_even_profit, profits_profit_no_timestamp, timestamps_profit_no_timestamp, filename_without_extension):
 
@@ -457,7 +484,7 @@ def check_ponzi_criteria(ocel, filename_without_extension, folder_path, node_url
     """
 
     input_output_flow(ocel, filename_without_extension, folder_path, node_url, likehood_threshold)
-    
+    #alignments_calculations(ocel)
 
     """
     #check if token functions implemented 
@@ -466,18 +493,7 @@ def check_ponzi_criteria(ocel, filename_without_extension, folder_path, node_url
     #TODO als main address eher sc_address aus input_output_flow nehmen, welche die meisten ether erhalten hat
     which_token = ethereumnode.check_if_address_is_a_token(main_smart_contract, node_url, likehood_threshold)
     print("address is ",which_token)
-    """
-
-
-    """
-    my own BPMN
-    
-    net, initial_marking, final_marking = load_bpmn_petri(filename_without_extension)
-
-    traditional_log = ocel_flattening.flatten(ocel, "ocel:type:Address_o") # gegebenenfalls noch from_o addresse als objekt
-    replayed_traces = pm4py.conformance_diagnostics_token_based_replay(traditional_log, net, initial_marking, final_marking)
-    print(replayed_traces)
-    """
+    """    
 
     """
     Updating OCEL:

@@ -135,6 +135,12 @@ def rename_activities_in_calls(value_calls_df):
     #TODO <FunctionName> noch rauscutten
     return value_calls_df
 
+def rename_activities_in_delegatecalls(delegatecall_df):
+    # empty values in the column "concept:name"
+    mask = (delegatecall_df["concept:name"].isna() | (delegatecall_df["concept:name"] == "") ) & (delegatecall_df["calltype"] == "DELEGATECALL")
+    delegatecall_df.loc[mask, "concept:name"] = "delegate call and transfer Ether"
+    return delegatecall_df
+
 
 def get_address_types(addresses, node_url, folder_path, contract_file_name):
     """
@@ -228,8 +234,11 @@ def preprocess(format_type, trace_tree_path, events_dapp_path, value_calls_dapp_
             dapp_df = convert_df_coloumns(dapp_df)
 
             # Rename activities in Calls (every file except EVENTS DAPP)
-            if dapp_name != "EVENTS DAPP":
+            if dapp_name != "EVENTS DAPP" and dapp_name != "DELEGATECALL":
                 dapp_df = rename_activities_in_calls(dapp_df)
+
+            if dapp_name == "DELEGATECALL":    
+                dapp_df = rename_activities_in_delegatecalls(dapp_df)
             
             # preprocess only EVENTS dapp
             if dapp_name == "EVENTS DAPP":

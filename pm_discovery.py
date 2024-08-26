@@ -20,7 +20,6 @@ def pn_and_dfg_discovery(ocel, filename_without_extension):
     print(ocel)
     #print(pm4py.ocel_get_object_types(ocel))
     #print(pm4py.ocel_object_type_activities(ocel))
-    #print(pm4py.ocel_temporal_summary(ocel))
     #print(pm4py.ocel_objects_summary(ocel)) # life cycle of the objects
     print(pm4py.ocel_objects_summary(ocel))
     

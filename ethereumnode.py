@@ -56,6 +56,14 @@ def check_if_address_is_sc_or_eoa(address, w3):
 
 
 def check_if_address_is_a_token(address, node_url, likehood_threshold):
+    """
+    Checks weather the address is a token contract or not.
+    :param address: Ethereum address
+    :param node_url: URL of the Ethereum node
+    :param likehood_threshold: threshold to determine if the address is a token contract or not
+
+    Tests if the address is a token contract by checking if the address has the common function signatures of ERC-20 and ERC-721(NFT) token contracts.
+    """
     # Connection
     w3 = check_if_connection_is_established(node_url)
 

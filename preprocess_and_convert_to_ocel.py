@@ -282,9 +282,14 @@ def preprocess(format_type, trace_tree_path, events_dapp_path, value_calls_dapp_
     # TODO: implement tracePosDepth statt tracePos für Baumstruktur -> furter research
     combined_df = combined_df.sort_values(["time:timestamp", "transactionIndex", "tracePos"])
     
-    # combine the "address" and "to" columns into a new column "Address_o" (object)
-    combined_df["Address_o"] = combined_df["address"].combine_first(combined_df["to"]) # erste implementiert war andersrum: combined_df["to"].combine_first(combined_df["address"])
-    #just for checking the step: #helper.save_preprocessed_file(combined_df, os.path.join(folder_path,'df_combinded_' + contract_file_name), format_type)
+    #NEW "address" kommt gegebenenfalls nicht mal vor
+    if "address" in combined_df.columns:
+        # combine the "address" and "to" columns into a new column "Address_o" (object)
+        combined_df["Address_o"] = combined_df["address"].combine_first(combined_df["to"]) # erste implementiert war andersrum: combined_df["to"].combine_first(combined_df["address"])
+        #just for checking the step: #helper.save_preprocessed_file(combined_df, os.path.join(folder_path,'df_combinded_' + contract_file_name), format_type)
+    else:
+        # if there is no "address" column, use the "to" column as the "Address_o" column
+        combined_df["Address_o"] = combined_df["to"]
     
     # get the address types for the addresses of both coloumns, excluding NaN values
     address_set = set(combined_df["Address_o"].dropna()).union(set(combined_df["from"].dropna()))

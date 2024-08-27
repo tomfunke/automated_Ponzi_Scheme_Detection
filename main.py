@@ -58,7 +58,11 @@ def main():
 
     # Set the paths for faster testing:
     # Path to log folder
-    input_folder_path = "/Users/tomfunke/Desktop/logging/ServerKopie/resources_chicken_and_coinbase_longrange"
+    input_folder_path = "/Users/tomfunke/Desktop/logging/locale_extraktion/inklusive_nondapp/ether_doubler_without_deployer"
+    #"/Users/tomfunke/Desktop/logging/locale_extraktion/inklusive_nondapp/ultra_short_ether_doubler"
+    #"/Users/tomfunke/Desktop/logging/locale_extraktion/inklusive_nondapp/small_ether_doubler"
+    #"/Users/tomfunke/Desktop/logging/ServerKopie/chicken_all"
+    #"/Users/tomfunke/Desktop/logging/ServerKopie/resources_chicken_and_coinbase_longrange"
     #"/Users/tomfunke/Desktop/logging/ServerKopie/resources_augur_forsage_non_dapp" #server
     #"/Users/tomfunke/Desktop/logging/locale_extraktion/inklusive_nondapp/ether_doubler_without_deployer"
     #"/Users/tomfunke/Desktop/logging/locale_extraktion/inklusive_nondapp/coinbase_contract"
@@ -73,7 +77,10 @@ def main():
     
     # Just the name without the prefix and suffix (main contract_address with range withour file format)
     # example: "0x9758da9b4d001ed2d0df46d25069edf53750767a_1335983_1497934"
-    input_contract_file_name = "0x1ed3d2c916cab00631cce4b08a7f880d4badae94_5851509_6251509" #chicken 400k
+    input_contract_file_name = "0xfd2487cc0e5dce97f08be1bc8ef1dce8d5988b4d_1014288_12679208"
+    #"0xfd2487cc0e5dce97f08be1bc8ef1dce8d5988b4d_1014288_1018978"
+    #"0x1ed3d2c916cab00631cce4b08a7f880d4badae94_5851509_20493210"# chicken all
+    #"0x1ed3d2c916cab00631cce4b08a7f880d4badae94_5851509_6251509" #chicken 400k
     #"0xa9d1e08c7793af67e9d92fe308d5697fb81d3e43_15148951_15304321" #coinbase server 150k
     #"0x75228dce4d82566d93068a8d5d49435216551599_5926229_6050000" #augur server
     #"0xfd2487cc0e5dce97f08be1bc8ef1dce8d5988b4d_1014288_12679208" #ether_doubler -> chain

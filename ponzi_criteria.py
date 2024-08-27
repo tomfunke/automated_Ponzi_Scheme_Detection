@@ -138,15 +138,15 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     first_row = events.iloc[0]
     deployment_address = first_row["from"]
     first_input = first_row["input"]
-    
     first_user = []
     address_dict = helper.open_address_file(folder_path, filename_without_extension)
     
     # Regular expression pattern for Ethereum address
     address_pattern = r"^(0x)?[0-9a-fA-F]{40}$"
 
+    #TODO check inputs with arrays...
     # Check if input matches the pattern and is therefore an ethereum address
-    if re.match(address_pattern, first_input) and first_input != "0x" :
+    if isinstance(first_input, str) and re.match(address_pattern, first_input) and first_input != "0x" :
         print("Input is a valid Ethereum address")
         # check if input address is in the address_dict
         if first_input in address_dict:
@@ -157,7 +157,7 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     first_user.append(deployment_address)
 
     print(first_user)
-    #print(address_dict["0xfffc07f1b5f1d6bd365aa1dbc9d16b1777f406a2"])
+    #print(address_dict["0xfffc07f1b5f1d6bd365aa1dbc9d16b1777f406a2"])# if eoa or sc
 
     # get important timestamps of the events
     last_timestamp = events["ocel:timestamp"].max()
@@ -189,7 +189,7 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
                     "sc_sends_to_first_user" : 0,
                     "first_user_triggers_to_pay_out" : 0
                    }
-    counts["count_other_paths"] = {"sends_zero_to_SC": 0, "invests_again": 0, "joins_without_investing": 0,
+    counts["count_other_paths"] = {"sends_zero_to_SC": 0,  "joins_without_investing": 0,
                     "Sc_sends_to_another_user_in_same_transaction": 0,
                     "Sc_sends_to_multiple_users_in_same_transaction": 0,
                     "SC_does_not_send_to_others_in_same_transaction": 0,
@@ -198,7 +198,15 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
                     "sc_sends_to_first_user" : 0,
                     "first_user_triggers_to_pay_out" : 0
                     }
-    
+    counts["counter_user_sends_again_paths"] = {"invests_again": 0,
+                    "Sc_sends_to_another_user_in_same_transaction": 0,
+                    "Sc_sends_to_multiple_users_in_same_transaction": 0,
+                    "SC_does_not_send_to_others_in_same_transaction": 0,
+                    "Internal_Upgrade_Event": 0,
+                    "sc_sends_to_iniating_user" : 0,
+                    "sc_sends_to_first_user" : 0,
+                    "first_user_triggers_to_pay_out" : 0
+                    }
     
     def innerloop_for_same_tx_hash(i, events, hash_of_this_tx, pathing_type):
         # now check if same transaction has multiple transaction traces (tracePos)
@@ -291,6 +299,7 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
                 # check if from_Typ is a contract or an EOA
                 if(row["from_Type"] == "EOA"): # so it cant be the Dapps first sending transaction
                     ####print("Sender is a EOA: ", user)
+                    #events.iloc[i]["ocel:activity"] = "Initial Investment of User" # does not work-> idea to manipulate the events
                     counts["count_initial_paths"]["initial_investment_to_Sc_by_EOA"] += 1
 
                     innerloop_for_same_tx_hash(i, events, row["hash"], "count_initial_paths")
@@ -301,8 +310,9 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
                 if (row["from_Type"] == "EOA"):
                     # its an EOA
                     ###print("investor is multiple times investing: ", user)
-                    counts["count_other_paths"]["invests_again"] += 1
+                    counts["counter_user_sends_again_paths"]["invests_again"] += 1
                     # TODO was passiert wenn ein user mehrmals investiert? -> wie wird das in der Abfgole berücksichtigt?
+                    innerloop_for_same_tx_hash(i, events, row["hash"], "counter_user_sends_again_paths")
                     
         
         else: # no value in this transaction
@@ -339,6 +349,8 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     # wenn alles 0 ist, dass es kein Ponzi ist? die Überweisung endet halt nur vor erst hier. Kann ja durch 0 callvalue noch getriggert werden
     
     print(counts["count_other_paths"])
+
+    print(counts["counter_user_sends_again_paths"])
                         
     # kick out all addresses which have no value transactions ( interaction as sender or as receiver)
     address_balance = {address: values for address, values in address_balance.items() if values["interaction_as_sender"] > 0 or values["interaction_as_receiver"] > 0}
@@ -361,11 +373,14 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     # the SC has a special role in the Ponzi scheme, as it is the contract that receives the ether from the users and distributes it to the other users.
     # The SC is the address that receives the most ether from the users.
     sc_address = max(address_balance, key=lambda x: address_balance[x]["received"])
-    print(f"The smart contract address is: {sc_address}")
+    print(f"The smart contract address with the most ether transfer is: {sc_address}")
     #TODO double check by checking if its a SC
 
-    #which_token = ethereumnode.check_if_address_is_a_token(sc_address, node_url, likehood_threshold)
-    #print("address is ",which_token)
+    which_token = helper.get_kind_of_Sc(sc_input, node_url, likehood_threshold)
+    if which_token == 2:
+        print("The contract got doubled checked and is also no token contract")
+    elif which_token == 1:
+        print("token contract")
 
     # Addresses with no incoming transactions to the SC are considered to be the first users in the Ponzi scheme. They should have no first_transaction timestamp.
     users_with_no_input = [address for address in address_balance if address_balance[address]["invested"] == 0]
@@ -389,7 +404,7 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
 
     # calculate the profit of each user except the main SC
     # The profit of a user is the ether received minus the ether invested.
-    user_profits = {address: address_balance[address]["received"] - address_balance[address]["invested"] for address in address_balance if address != sc_address}
+    user_profits = {address: address_balance[address]["received"] - address_balance[address]["invested"] for address in address_balance if address != sc_input}
     #TODO profit timestamp einbauen
 
     # median profit except the SC
@@ -440,7 +455,7 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     # check if the SC has an external investor (who has invested the most by far)
     # The user who has invested the most ether (and is not the SC) and did not make profit is considered to be the external investor. & did not joined as last.
     user_most_invested = max(
-    (address for address in address_balance if address != sc_address),
+    (address for address in address_balance if address != sc_input),
     key=lambda x: address_balance[x]["invested"])
     print(f"The user who invested the most ether is: {user_most_invested}")
     # profit of the user who invested the most
@@ -605,19 +620,10 @@ def check_ponzi_criteria(ocel, filename_without_extension, folder_path, node_url
     input_output_flow(ocel, filename_without_extension, folder_path, node_url, likehood_threshold)
     #alignments_calculations(ocel)
 
-    """
-    #check if token functions implemented 
-    main_smart_contract = filename_without_extension.split('_')[0]
-    print("Main smart contract:", main_smart_contract)
-    #TODO als main address eher sc_address aus input_output_flow nehmen, welche die meisten ether erhalten hat
-    which_token = ethereumnode.check_if_address_is_a_token(main_smart_contract, node_url, likehood_threshold)
-    print("address is ",which_token)
-    """    
+  
 
     """
     Updating OCEL:
-    After manipulating the DataFrame, you can update the OCEL object:
-    pythonCopyocel.events = modified_events_df
-    ocel.objects = modified_objects_df
+    After manipulating the DataFrame, how to update the OCEL object to reflect these changes?
     """
     return

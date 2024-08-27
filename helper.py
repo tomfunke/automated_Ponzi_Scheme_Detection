@@ -2,6 +2,7 @@ import os
 import sys
 import json
 import pandas as pd
+import ethereumnode
 
 def open_contracts_txt_file(folder_path, contract_file_name):
     contracts_file_path = os.path.join(folder_path,'contracts_dapp_' + contract_file_name+'.txt')
@@ -99,3 +100,19 @@ def get_contract_address_from_blockrange_name(file_name):
     # Extract the contract address from the file name
     contract_address = file_name.split('_')[0]
     return contract_address
+
+def get_kind_of_Sc(sc_address, node_url, likehood_threshold):
+    #check if the file already exists
+    if os.path.exists(f"output/which_kind_of_Sc_{sc_address}.txt"):
+        print("Reading file which kind of Smart Contract it is...", sc_address)  
+        with open(f"output/which_kind_of_Sc_{sc_address}.txt", 'r') as file:
+            which_token = int(file.read())
+
+    else:
+        print("Checking which kind of Smart Contract it is...", sc_address)
+        which_token = ethereumnode.check_if_address_is_a_token(sc_address, node_url, likehood_threshold)
+        # Save which token as a txt file
+        with open(f"output/which_kind_of_Sc_{sc_address}.txt", 'w') as file:
+            file.write(str(which_token))
+    
+    return which_token

@@ -72,7 +72,8 @@ def check_if_address_is_a_token(address, node_url, likehood_threshold):
     code = w3.eth.get_code(address_checksum)
 
     if code == b'':  # No code at the address
-        return "EOA"
+        print("No code at the address->EOA")
+        return 0
     
 
     # Common function signatures for token contracts ERC-20 and ERC-721(NFT)
@@ -96,6 +97,116 @@ def check_if_address_is_a_token(address, node_url, likehood_threshold):
             '0xe985e9c5',  # isApprovedForAll(address,address)
         ]
     }
+    # Minimal ABI for ERC20 tokens
+    ERC20_ABI = [
+        {
+            "constant": True,
+            "inputs": [],
+            "name": "name",
+            "outputs": [{"name": "", "type": "string"}],
+            "type": "function"
+        },
+        {
+            "constant": True,
+            "inputs": [],
+            "name": "symbol",
+            "outputs": [{"name": "", "type": "string"}],
+            "type": "function"
+        },
+        {
+            "constant": True,
+            "inputs": [],
+            "name": "decimals",
+            "outputs": [{"name": "", "type": "uint8"}],
+            "type": "function"
+        },
+        {
+            "constant": True,
+            "inputs": [{"name": "_owner", "type": "address"}],
+            "name": "balanceOf",
+            "outputs": [{"name": "balance", "type": "uint256"}],
+            "type": "function"
+        }
+    ]
+    ERC721_ABI = [
+    {
+        "inputs": [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
+        "name": "ownerOf",
+        "outputs": [{"internalType": "address", "name": "", "type": "address"}],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [{"internalType": "address", "name": "owner", "type": "address"}],
+        "name": "balanceOf",
+        "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+        "stateMutability": "view",
+        "type": "function"
+    }
+    ]   
+    def is_erc721_token(contract_address):
+        contract = w3.eth.contract(address=contract_address, abi=ERC721_ABI)
+        try:
+            # Try to call the ownerOf function with a random token ID
+            contract.functions.ownerOf(1).call()
+            return True
+        except ContractLogicError:
+            # If the token ID doesn't exist, it might still be an ERC721 token
+            try:
+                # Check if balanceOf function exists
+                contract.functions.balanceOf(contract_address).call()
+                return True
+            except:
+                return False
+        except Exception:
+            return False
+    
+    def is_erc20_token(contract):
+        try:
+            name = contract.functions.name().call()
+            symbol = contract.functions.symbol().call()
+            decimals = contract.functions.decimals().call()
+            print(f"Token Name: {name}")
+            print(f"Token Symbol: {symbol}")
+            print(f"Token Decimals: {decimals}")
+            return True
+        except ContractLogicError as e:
+            print(f"Contract does not implement ERC20 interface: {str(e)}")
+            return False
+        except Exception as e:
+            print(f"An error occurred: {str(e)}")
+            return False
+
+
+    def check_token_type(contract_address):
+        if is_erc20_token(contract_address):
+            print("ERC721 (NFT)")
+            return 1
+        elif is_erc721_token(contract_address):
+            print("ERC20 fungible token")
+            return 1
+        else:
+            print("Not a token contract")
+            return 2
+
+    token_type = check_token_type(address_checksum)
+    return token_type
+    """
+    try:
+        name = contract.functions.name().call()
+        symbol = contract.functions.symbol().call()
+        decimals = contract.functions.decimals().call()
+        print(f"Token Name: {name}")
+        print(f"Token Symbol: {symbol}")
+        print(f"Token Decimals: {decimals}")
+        return True
+    except ContractLogicError as e:
+        print(f"Contract does not implement ERC20 interface: {str(e)}")
+        return False
+    except Exception as e:
+        print(f"An error occurred: {str(e)}")
+        return False
+
     results = {}
     for standard, signatures in function_signatures.items():
         matches = 0
@@ -116,7 +227,11 @@ def check_if_address_is_a_token(address, node_url, likehood_threshold):
     most_likely = max(results, key=results.get)
     print(results)
     if results[most_likely] >= likehood_threshold:  # If more than 66.66% of functions are present
-        return f"Likely {most_likely} token"
+        print(f"Likely {most_likely} token")
+        print(f"{most_likely} token contract checking not implemented yet")
+        return 1
     else:
-        return "likely NOT a standard token contract"
+        print("likely NOT a standard token contract")
+        return 2 # is a normal smart contract -> perfetc for our case
 
+"""

@@ -23,7 +23,7 @@ def load_bpmn_petri(filename_without_extension):
     """
 
     # Load the BPMN file
-    bpmn_graph = bpmn_importer.apply("input/ponzi.bpmn")
+    bpmn_graph = bpmn_importer.apply("input/ponzi_actual.bpmn.bpmn")
     
     # Visualize the imported BPMN
     gviz = bpmn_visualizer.apply(bpmn_graph)
@@ -90,11 +90,11 @@ def plotting_tx(timestamps_unprofit, losses, profits_profitable_with_timestamp, 
 
     # Plot even profit users in green
     if timestamps_even_profit:
-        plt.scatter(timestamps_even_profit, profits_even_profit, color='orange', label='Even Profit Users')
+        plt.scatter(timestamps_even_profit, profits_even_profit, color='orange', label='Break-Even Users')
 
     # Plot profitable users with no original timestamp in orange
     if timestamps_profit_no_timestamp and profits_profit_no_timestamp:
-        plt.scatter(timestamps_profit_no_timestamp, profits_profit_no_timestamp, color='blue', label='Profit - No Original Timestamp')
+        plt.scatter(timestamps_profit_no_timestamp, profits_profit_no_timestamp, color='blue', label='Non-Investing Profiteers')
 
 
     # Add labels and title
@@ -299,10 +299,11 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
                 # check if from_Typ is a contract or an EOA
                 if(row["from_Type"] == "EOA"): # so it cant be the Dapps first sending transaction
                     ####print("Sender is a EOA: ", user)
-                    #events.iloc[i]["ocel:activity"] = "Initial Investment of User" # does not work-> idea to manipulate the events
+                    #combined_df.loc[i+1, "concept:name"] = "user A initiates Transaction"-> idea to manipulate the events-> see branch
                     counts["count_initial_paths"]["initial_investment_to_Sc_by_EOA"] += 1
 
                     innerloop_for_same_tx_hash(i, events, row["hash"], "count_initial_paths")
+                #else: row["from_Type"] == "SC" other sc which sending to the main SC on this path for their first time
             
             
             # Not first transaction of the user
@@ -313,34 +314,33 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
                     counts["counter_user_sends_again_paths"]["invests_again"] += 1
                     # TODO was passiert wenn ein user mehrmals investiert? -> wie wird das in der Abfgole berücksichtigt?
                     innerloop_for_same_tx_hash(i, events, row["hash"], "counter_user_sends_again_paths")
-                    
+                #else: row["from_Type"] == "SC" other sc which sending again to the main SC on this path
         
         else: # no value in this transaction
-            # Also events will be counted here AGAIN->wrongly
-            # TODO calltype empty -> events
-            #if row["address"] == sc_input:
-            #    print("nochamal gezählt?")
+            # events would be counted here because of no value in the transaction but therefore we check the "to" == sc_input next
 
-            # if callvalue is 0 and someone is sending to the SC means its a trigger from outside the SC
+            # if callvalue is 0 and someone is sending to the MAIN SC means its a trigger from outside the SC
             if(row["to"] == sc_input):
                 ##print(user, " triggers from outside the SC")
 
-                # TODO joining without investing
+                # joining without investing
                 # first interaction and event happens but not value is sent
                 if address_balance[user]["first_interaction_as_sender"] == None:
                     counts["count_other_paths"]["joins_without_investing"] += 1
                 
                 # add timestamp for first interaction as sender
                 if address_balance[user]["first_interaction_as_sender"] == None:
-                    address_balance[user]["first_interaction_as_sender"] = timestamp
+                    address_balance[user]["first_interaction_as_sender"] = timestamp # now he joined
                     ##print("First interaction of user: ", user)
                 
+                # path of no value transactions
                 counts["count_other_paths"]["sends_zero_to_SC"] += 1
-                #TODO test if the SC sends to another user like in 0xa068bdda7b9f597e8a2eb874285ab6b864836cb8e48a1b6fccb0150bf44f5592 #coinbase ODER 0xa068bdda7b9f597e8a2eb874285ab6b864836cb8e48a1b6fccb0150bf44f5592 chicken
+
+                # Does SC got triggered to send?
+                # if the SC sends to another user like in 0xa068bdda7b9f597e8a2eb874285ab6b864836cb8e48a1b6fccb0150bf44f5592 #coinbase ODER 0xa068bdda7b9f597e8a2eb874285ab6b864836cb8e48a1b6fccb0150bf44f5592 chicken
                 # same hash should have callvalue > 0 and from = SC and to = user
                 innerloop_for_same_tx_hash(i, events, row["hash"], "count_other_paths")
-                #otherwise event triggering without funds moving?
-                #like gaming /attacking 
+                
                 
     
     # print initial_investment_to_Sc_by_EOA
@@ -374,13 +374,12 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     # The SC is the address that receives the most ether from the users.
     sc_address = max(address_balance, key=lambda x: address_balance[x]["received"])
     print(f"The smart contract address with the most ether transfer is: {sc_address}")
-    #TODO double check by checking if its a SC
 
     which_token = helper.get_kind_of_Sc(sc_input, node_url, likehood_threshold)
     if which_token == 2:
         print("The contract got doubled checked and is also no token contract")
     elif which_token == 1:
-        print("token contract")
+        print("token contract!\n In depth analysis for token contracts not implemented yet!\n It is recommended that the result be considered with a degree of caution, as it is based on the assumption that only native ether is involved.")
 
     # Addresses with no incoming transactions to the SC are considered to be the first users in the Ponzi scheme. They should have no first_transaction timestamp.
     users_with_no_input = [address for address in address_balance if address_balance[address]["invested"] == 0]
@@ -497,7 +496,7 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
 
 
     #R3
-    # each investor makes profit if he is not the last investor/ new investors send ether to the SC after his investment
+    # each investor makes profit if he is not the last investor/ new investors send ENOUGH ether to the SC after his investment
     # unlucky gamers in casino should still lose money -> rules out R3
 
 

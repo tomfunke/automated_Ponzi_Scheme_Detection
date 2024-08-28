@@ -14,6 +14,7 @@ from pandas import Timestamp
 import numpy as np
 import re
 import matplotlib.pyplot as plt
+import pm_discovery
 
 
 def load_bpmn_petri(filename_without_extension):
@@ -127,7 +128,7 @@ def plotting_tx(timestamps_unprofit, losses, profits_profitable_with_timestamp, 
 
     return
 
-def input_output_flow(ocel, filename_without_extension, folder_path, node_url, likehood_threshold):
+def input_output_flow(ocel, filename_without_extension, folder_path, node_url, likehood_threshold, combined_df):
     # Step 1: Extract relevant events and attributes
     events = ocel.events
     objects = ocel.objects
@@ -282,7 +283,7 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
         
         return
     
-
+    print(combined_df["concept:name"][0])
     # iterate through the events
     for i, row in events.iterrows():
         user = row["from"]
@@ -299,7 +300,8 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
                 # check if from_Typ is a contract or an EOA
                 if(row["from_Type"] == "EOA"): # so it cant be the Dapps first sending transaction
                     ####print("Sender is a EOA: ", user)
-                    #events.iloc[i]["ocel:activity"] = "Initial Investment of User" # does not work-> idea to manipulate the events
+                    #combined_df["concept:name"][i+1] = "Initial Investment of User" # does not work-> idea to manipulate the events
+                    combined_df.loc[i+1, "concept:name"] = "user A initiates Transaction"
                     counts["count_initial_paths"]["initial_investment_to_Sc_by_EOA"] += 1
 
                     innerloop_for_same_tx_hash(i, events, row["hash"], "count_initial_paths")
@@ -603,10 +605,10 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
 
 
     # return output if scam as file?
-    return address_balance
+    return events
 
 
-def check_ponzi_criteria(ocel, filename_without_extension, folder_path, node_url, likehood_threshold):
+def check_ponzi_criteria(ocel, filename_without_extension, folder_path, node_url, likehood_threshold, combined_df):
     print("Start checking Ponzi criteria:")
     # firstly check the ponzi if he is a contract or an EOA: extractor gives just trace tree output, when trying to extract a EOA address without creation
 
@@ -617,11 +619,34 @@ def check_ponzi_criteria(ocel, filename_without_extension, folder_path, node_url
     #print(ocel.objects)
     """
 
-    input_output_flow(ocel, filename_without_extension, folder_path, node_url, likehood_threshold)
+    man_combined_df = input_output_flow(ocel, filename_without_extension, folder_path, node_url, likehood_threshold, combined_df)
     #alignments_calculations(ocel)
 
-  
+    print("ocel converting...")
 
+    print(combined_df.columns)
+
+    
+    
+    object_selection = ["Address_o","from_o"] # ,"Address_Type", "from_Type" # types are additional attributes to differentiate between smart contracts and externally owned accounts (EOAs)
+    object_attributes = {"Address_o": "Address_Type",
+                         "from_o": "from_Type"
+                         }
+
+    # Creates a list of all columns that are additional for the OCEL as event attributes: All Coloumns - the chosen object - the standard columns time and activity
+    main_coloumns = np.array(['concept:name', 'time:timestamp']+object_selection)
+    remaining_attributes = np.setdiff1d(combined_df.columns.to_numpy(), main_coloumns) # remaining = all - main
+
+    #actual Ocel converting
+    # https://processintelligence.solutions/static/api/2.7.11/pm4py.html#pm4py.convert.convert_log_to_ocel
+    ocel = pm4py.convert_log_to_ocel(combined_df, object_types = object_selection, additional_object_attributes = object_attributes, additional_event_attributes = remaining_attributes)
+    #ocel = pm4py.convert_log_to_ocel(combined_df, object_types = object_selection, additional_event_attributes = remaining_attributes)
+    
+    # Save the OCEL events and object to a file
+    #pm4py.write_ocel_csv(ocel, os.path.join(folder_path,'df_ocel_events_' + contract_file_name + ".csv"),os.path.join(folder_path,'df_ocel_objects_' + contract_file_name + ".csv"))
+
+    #pm_discovery.pn_and_dfg_discovery(ocel, filename_without_extension)
+    alignments_calculations(ocel)
     """
     Updating OCEL:
     After manipulating the DataFrame, how to update the OCEL object to reflect these changes?

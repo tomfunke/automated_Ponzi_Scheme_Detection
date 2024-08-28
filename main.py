@@ -120,7 +120,7 @@ def main():
     Here begins the main function
     """
     # Preprocess the CSV and get the OCEL object: https://pm4py.fit.fraunhofer.de/static/assets/api/2.7.8/pm4py.objects.ocel.html#pm4py.objects.ocel.obj.OCEL
-    ocel = preprocess_and_convert_to_ocel.preprocess(format_type_trace_tree, trace_tree_path,events_dapp__path, value_calls_dapp_path, zero_value_calls_dapp_path, delegatecall_dapp_path, value_calls_non_dapp_path, input_folder_path, input_contract_file_name, node_url)
+    ocel, combined_df = preprocess_and_convert_to_ocel.preprocess(format_type_trace_tree, trace_tree_path,events_dapp__path, value_calls_dapp_path, zero_value_calls_dapp_path, delegatecall_dapp_path, value_calls_non_dapp_path, input_folder_path, input_contract_file_name, node_url)
     
     # legacy code: for each file own preprocess and ocel conversion
     #object_selection = ["from"]
@@ -137,7 +137,7 @@ def main():
     #ocel = pm4py.read_ocel(os.path.join(input_folder_path, 'df_ocel_events_' + input_contract_file_name + '.csv'), os.path.join(input_folder_path, 'df_ocel_objects_' + input_contract_file_name + '.csv'))
     
     # Check the Ponzi criteria
-    ponzi_criteria.check_ponzi_criteria(ocel, input_contract_file_name, input_folder_path, node_url, likehood_threshold)
+    ponzi_criteria.check_ponzi_criteria(ocel, input_contract_file_name, input_folder_path, node_url, likehood_threshold, combined_df)
 
 if __name__ == "__main__":
     main()

@@ -335,4 +335,4 @@ def preprocess(format_type, trace_tree_path, events_dapp_path, value_calls_dapp_
     pm4py.write_ocel_csv(ocel, os.path.join(folder_path,'df_ocel_events_' + contract_file_name + ".csv"),os.path.join(folder_path,'df_ocel_objects_' + contract_file_name + ".csv"))
     
     print("ocel converting done")
-    return ocel
+    return ocel, combined_df

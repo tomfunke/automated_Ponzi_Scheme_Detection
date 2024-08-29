@@ -107,6 +107,12 @@ def plotting_tx(timestamps_unprofit, losses, profits_profitable_with_timestamp, 
 
     # Set the x-axis limits manually
     #plt.xlim(pd.Timestamp('2016-02-16'), pd.Timestamp('2016-08-16')) # ether_doubler_without_deployer has outlier in 2018
+    #plt.xlim(pd.Timestamp('2015-07-01'), pd.Timestamp('2016-07-01')) # ethereumpyrmadi has outlier in 
+    #plt.xlim(pd.Timestamp('2016-01-01'), pd.Timestamp('2016-07-01')) # dynaumpyrmadi has outlier in 
+    #plt.xlim(pd.Timestamp('2016-03-22'), pd.Timestamp('2016-03-29')) # piggy has outlier in 
+    
+    # Set the y-axis limits manually
+    #plt.ylim([-0.2e19, 0.8e19]) #y-axe limit because millionmoney has this one huge outlier with 18 eth
 
     # Format x-axis for better date readability
     plt.gcf().autofmt_xdate()
@@ -136,11 +142,12 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
 
     # first row
     first_row = events.iloc[0]
-    deployment_address = first_row["from"]
+    #deployment_address = 
+    first_caller= first_row["from"]
     first_input = first_row["input"]
     first_user = []
     address_dict = helper.open_address_file(folder_path, filename_without_extension)
-    
+
     # Regular expression pattern for Ethereum address
     address_pattern = r"^(0x)?[0-9a-fA-F]{40}$"
 
@@ -154,9 +161,9 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
             first_user.append(first_input)
     else:
         print("Input is not a valid Ethereum address")
-    first_user.append(deployment_address)
+    first_user.append(first_caller)
 
-    print(first_user)
+    print("first users",first_user)
     #print(address_dict["0xfffc07f1b5f1d6bd365aa1dbc9d16b1777f406a2"])# if eoa or sc
 
     # get important timestamps of the events
@@ -168,16 +175,17 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     sc_input = helper.get_contract_address_from_blockrange_name(filename_without_extension)
 
     # Step 3: Process the data
-    address_balance = defaultdict(lambda: {"received": 0, "invested": 0, "first_transaction": None, "interaction_as_sender": 0, "interaction_as_receiver": 0, "first_interaction_as_sender": None})
+    address_balance = defaultdict(lambda: {"received": 0.0, "invested": 0.0, "first_transaction": None, "interaction_as_sender": 0, "interaction_as_receiver": 0, "first_interaction_as_sender": None})
 
     def update_balance(from_addr, to_addr, value):
+        value = float(value)
         if from_addr:
             address_balance[from_addr]["invested"] += value
             address_balance[from_addr]["interaction_as_sender"] += 1
         if to_addr:
             address_balance[to_addr]["received"] += value
             address_balance[to_addr]["interaction_as_receiver"] += 1
-    
+
     # count the different paths of the transactions
     counts = {"count_initial_paths": None, "count_other_paths": None}
     counts["count_initial_paths"] = {"initial_investment_to_Sc_by_EOA": 0,
@@ -187,7 +195,8 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
                     "Internal_Upgrade_Event": 0,
                     "sc_sends_to_iniating_user" : 0,
                     "sc_sends_to_first_user" : 0,
-                    "first_user_triggers_to_pay_out" : 0
+                    "first_user_triggers_to_pay_out" : 0,
+                    "counter_sending_to_previous_user" : 0
                    }
     counts["count_other_paths"] = {"sends_zero_to_SC": 0,  "joins_without_investing": 0,
                     "Sc_sends_to_another_user_in_same_transaction": 0,
@@ -196,7 +205,8 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
                     "Internal_Upgrade_Event": 0,
                     "sc_sends_to_iniating_user" : 0,
                     "sc_sends_to_first_user" : 0,
-                    "first_user_triggers_to_pay_out" : 0
+                    "first_user_triggers_to_pay_out" : 0,
+                    "counter_sending_to_previous_user" : 0
                     }
     counts["counter_user_sends_again_paths"] = {"invests_again": 0,
                     "Sc_sends_to_another_user_in_same_transaction": 0,
@@ -205,10 +215,11 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
                     "Internal_Upgrade_Event": 0,
                     "sc_sends_to_iniating_user" : 0,
                     "sc_sends_to_first_user" : 0,
-                    "first_user_triggers_to_pay_out" : 0
+                    "first_user_triggers_to_pay_out" : 0,
+                    "counter_sending_to_previous_user" : 0
                     }
     
-    def innerloop_for_same_tx_hash(i, events, hash_of_this_tx, pathing_type):
+    def innerloop_for_same_tx_hash(i, events, hash_of_this_tx, pathing_type, previous_user_id):
         # now check if same transaction has multiple transaction traces (tracePos)
         hash_of_this_tx = row["hash"]
         memory_of_this_hash = {"counter_how_often_sc_sends_to_others": 0,
@@ -253,6 +264,13 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
             if inner_row["callvalue"] > 0:
                 #user is the one who called the SC (the actual tx)
 
+                # save the first receiver of the first sc sending
+                if previous_user_id == None and inner_row["from"] == sc_input:
+                    first_receiver = inner_row["to"]
+                    first_user.append(first_receiver)
+                
+
+                
                 # check if the SC sends to another user
                 if inner_row["from"] == sc_input and inner_row["to"] != user:
                     ####print("SC sends to another user in the same transaction")
@@ -272,7 +290,12 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
                 if inner_row["from"] == sc_input and user in first_user and inner_row["to"] in first_user :
                     ###print("first user is the one who calls the sc to pay him out")
                     memory_of_this_hash["counter_how_often_sc_triggered_by_first_user_to_send_to_him"] += 1
-                    
+                
+                # chain check?
+                # if there is a previous_user_id and the receiver is the previous and its not the first line of tx where the SC is the receiver
+                if previous_user_id != None and inner_row["to"] == previous_user_id and inner_row["to"] != sc_input:
+                    counts[pathing_type]["counter_sending_to_previous_user"] += 1
+                
             
             # check if events
             if "address" in inner_row:
@@ -282,7 +305,8 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
         
         return
     
-
+    ####Main loop
+    previous_user_id = None
     # iterate through the events
     for i, row in events.iterrows():
         user = row["from"]
@@ -302,7 +326,9 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
                     #combined_df.loc[i+1, "concept:name"] = "user A initiates Transaction"-> idea to manipulate the events-> see branch
                     counts["count_initial_paths"]["initial_investment_to_Sc_by_EOA"] += 1
 
-                    innerloop_for_same_tx_hash(i, events, row["hash"], "count_initial_paths")
+                    innerloop_for_same_tx_hash(i, events, row["hash"], "count_initial_paths", previous_user_id)
+                    # Update previous_user_id for the next iteration
+                    previous_user_id = user
                 #else: row["from_Type"] == "SC" other sc which sending to the main SC on this path for their first time
             
             
@@ -313,7 +339,8 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
                     ###print("investor is multiple times investing: ", user)
                     counts["counter_user_sends_again_paths"]["invests_again"] += 1
                     # TODO was passiert wenn ein user mehrmals investiert? -> wie wird das in der Abfgole berücksichtigt?
-                    innerloop_for_same_tx_hash(i, events, row["hash"], "counter_user_sends_again_paths")
+                    innerloop_for_same_tx_hash(i, events, row["hash"], "counter_user_sends_again_paths",previous_user_id)
+                    previous_user_id = user
                 #else: row["from_Type"] == "SC" other sc which sending again to the main SC on this path
         
         else: # no value in this transaction
@@ -339,10 +366,9 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
                 # Does SC got triggered to send?
                 # if the SC sends to another user like in 0xa068bdda7b9f597e8a2eb874285ab6b864836cb8e48a1b6fccb0150bf44f5592 #coinbase ODER 0xa068bdda7b9f597e8a2eb874285ab6b864836cb8e48a1b6fccb0150bf44f5592 chicken
                 # same hash should have callvalue > 0 and from = SC and to = user
-                innerloop_for_same_tx_hash(i, events, row["hash"], "count_other_paths")
+                innerloop_for_same_tx_hash(i, events, row["hash"], "count_other_paths", None)
                 
                 
-    
     # print initial_investment_to_Sc_by_EOA
     print(counts["count_initial_paths"])
     # bedeuted es jetzt bei coinbase {'initial_investment_to_Sc_by_EOA': 156, 'Sc_sends_to_another_user_in_same_transaction': 0, 'Sc_sends_to_multiple_users_in_same_transaction': 0, 'SC_does_not_send_to_others_in_same_transaction': 156, 'Internal_Upgrade_Event': 0}
@@ -351,7 +377,44 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     print(counts["count_other_paths"])
 
     print(counts["counter_user_sends_again_paths"])
-                        
+
+    print("first users after loop",first_user)
+    # Step 4: Calculate the ratios
+    ###Ratios
+    
+    ratio_initial_not_send_all = counts["count_initial_paths"]["SC_does_not_send_to_others_in_same_transaction"] / counts["count_initial_paths"]["initial_investment_to_Sc_by_EOA"]
+    print("Initial investment: not directly sent to others ",ratio_initial_not_send_all)
+
+    ratio_initial_between_directly_and_all = 1 - ratio_initial_not_send_all
+    print("Initial investment: directly sent to others ",ratio_initial_between_directly_and_all)
+    
+    if ratio_initial_between_directly_and_all < 0.5:
+        print("Ratio is less than 50%") # probably not tree ponzi
+    elif ratio_initial_between_directly_and_all > 0.8:
+        print("Ratio is higher than 80%: maybe ponzi") # looks like ponzi structure because send directly to others
+    else:
+        print("between 50 and 80%")
+
+    # Ratio of: all tx with ether send to the SC from EOA / all tx to the SC from EOA (also 0 value tx)
+    ratio_tx_with_eth_and_all_tx = (counts["count_initial_paths"]["initial_investment_to_Sc_by_EOA"] + counts["counter_user_sends_again_paths"]["invests_again"]) / (counts["count_initial_paths"]["initial_investment_to_Sc_by_EOA"] + counts["counter_user_sends_again_paths"]["invests_again"] + counts["count_other_paths"]["sends_zero_to_SC"])
+    print(ratio_tx_with_eth_and_all_tx)
+    # if this is 1 it means that all transactions to the SC are with value -> sound like a Ponzi
+    #only values?
+    if ratio_tx_with_eth_and_all_tx == 1:
+        print("All transactions to the SC are with value: probably Ponzi")
+    elif ratio_tx_with_eth_and_all_tx > 0.8:
+        print("More than 80% of all transactions to the SC are with value: probably Ponzi")
+    elif ratio_tx_with_eth_and_all_tx > 0.5:
+        print("More than 50% of all transactions to the SC are with value: maybe Ponzi")
+    else: 
+        print("Less than 50% of all transactions to the SC are with value")
+
+    #TODO here are all addresess before getting kicked
+    howmany = 0
+    for address in address_balance:
+        howmany += 1
+    print("nunber of all addresses before those without eth get kicked: ", howmany) # all addresses before getting kicked
+
     # kick out all addresses which have no value transactions ( interaction as sender or as receiver)
     address_balance = {address: values for address, values in address_balance.items() if values["interaction_as_sender"] > 0 or values["interaction_as_receiver"] > 0}
     #these addresses interacted with the SC but did not invest any ether or received any ether
@@ -366,7 +429,7 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
         for address, values in address_balance.items():
             received_ether = wei_to_ether(values['received'])
             invested_ether = wei_to_ether(values['invested'])
-            f.write(f"{address},{received_ether},{invested_ether},{values['first_transaction']},{values['interaction_as_sender']},{values['interaction_as_receiver']},{values['first_interaction_as_sender']}\n")
+            f.write(f"{address},{received_ether:.18f},{invested_ether:.18f},{values['first_transaction']},{values['interaction_as_sender']},{values['interaction_as_receiver']},{values['first_interaction_as_sender']}\n")
     
     ######### calculate
     print("Calculating the Ponzi criteria")
@@ -382,13 +445,18 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
         print("token contract!\n In depth analysis for token contracts not implemented yet!\n It is recommended that the result be considered with a degree of caution, as it is based on the assumption that only native ether is involved.")
 
     # Addresses with no incoming transactions to the SC are considered to be the first users in the Ponzi scheme. They should have no first_transaction timestamp.
-    users_with_no_input = [address for address in address_balance if address_balance[address]["invested"] == 0]
+    users_with_no_input = [address for address in address_balance if address_balance[address]["invested"] == 0] # these are just the addresses which received but never sent
     #print(f"The first users in the Ponzi scheme are: {users_with_no_input}")
+
+
+
+    ######### Requirements Bartoletti et al. (2019)
+    print("Start with four requirements to check if the contract is a Ponzi scheme from Bartoletti et al. (2019)")
 
     #R1 logic
     # calculate how many users of all users have no incoming transactions to the SC
     number_of_users_with_no_input = len(users_with_no_input)
-    total_number_of_users = len(address_balance)
+    total_number_of_users = len(address_balance)# only with value transaction. there more addresses with interactions but no value transactions
     percentage_of_users_with_no_input = number_of_users_with_no_input / total_number_of_users
     print(f"The percentage of users without input is : {percentage_of_users_with_no_input:.2f}")
     if percentage_of_users_with_no_input > likehood_threshold:
@@ -399,7 +467,7 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     else:
         # could be Ponzi if more requirements are met
         print("Most addresses are sending ether to the SC. This is a first indicator that this Contract COULD be Ponzi scheme.(R1)")
-
+    #TODO percentage_of_users_with_no_input < 10 % ROT; < 50% ORANGE; < 90% GREEN
 
     # calculate the profit of each user except the main SC
     # The profit of a user is the ether received minus the ether invested.
@@ -484,8 +552,8 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     # zusatz?
     # calculate how many users have a profit greater than 0
     profitable_users = [address for address in user_profits if user_profits[address] > 0]
-    number_of_profitable_users = len(profitable_users)
-    percentage_of_profitable_users = number_of_profitable_users / total_number_of_users
+    number_of_profitable_users = len(profitable_users) # this excludes all the profit/loss = 0 users
+    percentage_of_profitable_users = number_of_profitable_users / total_number_of_users #TODO toal number of users are just the ones with value transactions
     print(f"The percentage of profitable users is: {percentage_of_profitable_users:.2f}")
     if percentage_of_profitable_users > likehood_threshold:
         print("The percentage of profitable users is higher than the threshold of 66.66%. This means most of the users in this Contract are making a profit. This is a strong indicator that this Contract is NOT a Ponzi scheme. ")

@@ -141,6 +141,12 @@ def rename_activities_in_delegatecalls(delegatecall_df):
     delegatecall_df.loc[mask, "concept:name"] = "delegate call and transfer Ether"
     return delegatecall_df
 
+def rename_activities_in_events(events_df):
+    # empty values in the column "concept:name"
+    mask = (events_df["concept:name"].isna() | (events_df["concept:name"] == "") )
+    events_df.loc[mask, "concept:name"] = "undecoded event"
+    return events_df
+
 
 def get_address_types(addresses, node_url, folder_path, contract_file_name):
     """
@@ -255,6 +261,8 @@ def preprocess(format_type, trace_tree_path, events_dapp_path, value_calls_dapp_
                     # delete the decimal numbers in the from-address, but only if not NaN and string. 
                     dapp_df["from"] = dapp_df["from"].apply(lambda x: re.sub(r'^\d+$', '', x) if pd.notna(x) and isinstance(x, str) else x)
 
+                # Rename activities in Events Dapp
+                dapp_df = rename_activities_in_events(dapp_df)
 
             helper.save_preprocessed_file(dapp_df, dapp_path, format_type)
 

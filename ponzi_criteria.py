@@ -23,7 +23,7 @@ def load_bpmn_petri(filename_without_extension):
     """
 
     # Load the BPMN file
-    bpmn_graph = bpmn_importer.apply("input/ponzi_actual.bpmn.bpmn")
+    bpmn_graph = bpmn_importer.apply("input/ponzi_actual.bpmn")
     
     # Visualize the imported BPMN
     gviz = bpmn_visualizer.apply(bpmn_graph)
@@ -107,6 +107,7 @@ def plotting_tx(timestamps_unprofit, losses, profits_profitable_with_timestamp, 
 
     # Set the x-axis limits manually
     #plt.xlim(pd.Timestamp('2016-02-16'), pd.Timestamp('2016-08-16')) # ether_doubler_without_deployer has outlier in 2018
+    #plt.xlim(pd.Timestamp('2016-02-16'), pd.Timestamp('2016-04-16')) # ether doubler noch mehr weg gecuttet um so sehen
     #plt.xlim(pd.Timestamp('2015-07-01'), pd.Timestamp('2016-07-01')) # ethereumpyrmadi has outlier in 
     #plt.xlim(pd.Timestamp('2016-01-01'), pd.Timestamp('2016-07-01')) # dynaumpyrmadi has outlier in 
     #plt.xlim(pd.Timestamp('2016-03-22'), pd.Timestamp('2016-03-29')) # piggy has outlier in 
@@ -366,7 +367,8 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
                 # Does SC got triggered to send?
                 # if the SC sends to another user like in 0xa068bdda7b9f597e8a2eb874285ab6b864836cb8e48a1b6fccb0150bf44f5592 #coinbase ODER 0xa068bdda7b9f597e8a2eb874285ab6b864836cb8e48a1b6fccb0150bf44f5592 chicken
                 # same hash should have callvalue > 0 and from = SC and to = user
-                innerloop_for_same_tx_hash(i, events, row["hash"], "count_zero_sending_paths", None)
+                innerloop_for_same_tx_hash(i, events, row["hash"], "count_zero_sending_paths", previous_user_id)
+                #previous_user_id = user
                 
                 
     # print initial_investment_to_Sc_by_EOA
@@ -435,17 +437,19 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     # TODO counts["count_zero_sending_paths"]
     # etherdoubler sends back by triggering via  sends_zero_to_SC'
     #  sc_sends_to_iniating_user  
-    ratio_initate_outcashing_and_all_zero_sendings = counts["count_zero_sending_paths"]["sc_sends_to_iniating_user"]/counts["count_zero_sending_paths"]["sends_zero_to_SC"]
-    print("ratio_initate_outcashing_and_all_zero_sendings", ratio_initate_outcashing_and_all_zero_sendings)
+    if counts["count_zero_sending_paths"]["sc_sends_to_iniating_user"] > 0:
+        ratio_initate_outcashing_and_all_zero_sendings = counts["count_zero_sending_paths"]["sc_sends_to_iniating_user"]/counts["count_zero_sending_paths"]["sends_zero_to_SC"]
+        print("ratio_initate_outcashing_and_all_zero_sendings", ratio_initate_outcashing_and_all_zero_sendings)
 
-    # sc_sends_to_first_user
-    ratio_sends_to_first_user_and_all_zero_sendings = counts["count_zero_sending_paths"]["sc_sends_to_first_user"]/counts["count_zero_sending_paths"]["sends_zero_to_SC"]
-    print("ratio_sends_to_first_user_and_all_zero_sendings", ratio_sends_to_first_user_and_all_zero_sendings)
+        # sc_sends_to_first_user
+        ratio_sends_to_first_user_and_all_zero_sendings = counts["count_zero_sending_paths"]["sc_sends_to_first_user"]/counts["count_zero_sending_paths"]["sends_zero_to_SC"]
+        print("ratio_sends_to_first_user_and_all_zero_sendings", ratio_sends_to_first_user_and_all_zero_sendings)
 
-    # first_user_triggers_to_pay_out
-    ratio_first_user_triggers_to_pay_out_and_all_zero_sendings = counts["count_zero_sending_paths"]["first_user_triggers_to_pay_out"]/counts["count_zero_sending_paths"]["sends_zero_to_SC"]
-    print("ratio_first_user_triggers_to_pay_out_and_all_zero_sendings", ratio_first_user_triggers_to_pay_out_and_all_zero_sendings)
-
+        # first_user_triggers_to_pay_out
+        ratio_first_user_triggers_to_pay_out_and_all_zero_sendings = counts["count_zero_sending_paths"]["first_user_triggers_to_pay_out"]/counts["count_zero_sending_paths"]["sends_zero_to_SC"]
+        print("ratio_first_user_triggers_to_pay_out_and_all_zero_sendings", ratio_first_user_triggers_to_pay_out_and_all_zero_sendings)
+    else:
+        print("No zero sending paths")
 
 
 
@@ -573,7 +577,7 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     timestamp_of_user_most_invested = address_balance[user_most_invested]["first_transaction"]
     print(f"The timestamp of the first transaction of the user who invested the most ether is: {timestamp_of_user_most_invested}")
     if last_timestamp == timestamp_of_user_most_invested and profit_of_user_most_invested < 0:
-        # handover scheme -> Ponzi
+        # handover scheme -> Ponzi Red
         print("The last timestamp is equal to the timestamp of the user who invested the most ether and this big investor loses money. This could be a strong indicator that this Contract is a Ponzi scheme.(R2)")#Red
     elif last_timestamp != timestamp_of_user_most_invested and profit_of_user_most_invested < 0:
         # Rules out R2-> no ponzi
@@ -606,8 +610,40 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
 
 
     #R3
-    # each investor makes profit if new investors send ENOUGH ether to the SC after his investment
+    # each investor makes profit if ENOUGH new investors send ENOUGH ether to the SC after his investment
     # unlucky gamers in casino should still lose money -> rules out R3
+    #early einsteiger sollten also gewinn machen
+    #user_profits[address] profits of a address
+    # ratio of the sinking ratio of profit takers with the user growth
+    anzahl_user_bis_jetzt = 0
+    anzahl_profits_bis_jetzt = 0
+    last_ratio = 0
+    how_ofte_does_ratio_sink = 0
+    for address in user_profits:
+        anzahl_user_bis_jetzt += 1
+        if user_profits[address] > 0: # if profit
+            anzahl_profits_bis_jetzt += 1
+        
+        user_rataio = anzahl_profits_bis_jetzt/anzahl_user_bis_jetzt
+        print(user_rataio)
+        if last_ratio > user_rataio:
+            how_ofte_does_ratio_sink += 1
+
+        last_ratio = user_rataio
+
+    ratio_of_sinking_profit_takers_with_user_growth = how_ofte_does_ratio_sink/anzahl_user_bis_jetzt
+    print("ratio_of_sinking_profit_takers_with_user_growth", ratio_of_sinking_profit_takers_with_user_growth)
+    if ratio_of_sinking_profit_takers_with_user_growth > 0.5:
+        print("When we check the profability of the users we see that the ratio of profitable users is sinking with the user growth (R3)")
+
+        
+
+            
+
+           
+
+
+
 
 
     #R4

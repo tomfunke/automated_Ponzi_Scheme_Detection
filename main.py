@@ -58,7 +58,7 @@ def main():
 
     # Set the paths for faster testing:
     # Path to log folder
-    input_folder_path = "/Users/tomfunke/Desktop/logging/locale_extraktion/inklusive_nondapp/ether_doubler_without_deployer"
+    input_folder_path = "/Users/tomfunke/Desktop/logging/ServerKopie/resources_chicken_and_coinbase_longrange"
     #"/Users/tomfunke/Desktop/logging/locale_extraktion/inklusive_nondapp/bunny_handover"
     #"/Users/tomfunke/Desktop/logging/locale_extraktion/inklusive_nondapp/millionmoney"
     #"/Users/tomfunke/Desktop/logging/locale_extraktion/inklusive_nondapp/piggy_waterfall"
@@ -84,7 +84,7 @@ def main():
     
     # Just the name without the prefix and suffix (main contract_address with range withour file format)
     # example: "0x9758da9b4d001ed2d0df46d25069edf53750767a_1335983_1497934"
-    input_contract_file_name = "0xfd2487cc0e5dce97f08be1bc8ef1dce8d5988b4d_1014288_12679208" #ether_doubler -> chain
+    input_contract_file_name = "0xa9d1e08c7793af67e9d92fe308d5697fb81d3e43_15148951_15304321" #coinbase server 150k
     #"0xfe9c69945687539fabbf531133838d9cce522a76_1078846_4139113" # bunny
     #"0xbcf935d206ca32929e1b887a07ed240f0d8ccd22_8447267_8654321" #mill
     #"0xdcb13fa157eebf22ddc8c9aa1d6e394810de6fa3_1196017_6036811"#piggy

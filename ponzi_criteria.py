@@ -187,7 +187,7 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
             address_balance[to_addr]["interaction_as_receiver"] += 1
 
     # count the different paths of the transactions
-    counts = {"count_initial_paths": None, "count_other_paths": None}
+    counts = {"count_initial_paths": None, "count_zero_sending_paths": None}
     counts["count_initial_paths"] = {"initial_investment_to_Sc_by_EOA": 0,
                     "Sc_sends_to_another_user_in_same_transaction": 0,
                     "Sc_sends_to_multiple_users_in_same_transaction": 0,
@@ -198,7 +198,7 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
                     "first_user_triggers_to_pay_out" : 0,
                     "counter_sending_to_previous_user" : 0
                    }
-    counts["count_other_paths"] = {"sends_zero_to_SC": 0,  "joins_without_investing": 0,
+    counts["count_zero_sending_paths"] = {"sends_zero_to_SC": 0,  "joins_without_investing": 0,
                     "Sc_sends_to_another_user_in_same_transaction": 0,
                     "Sc_sends_to_multiple_users_in_same_transaction": 0,
                     "SC_does_not_send_to_others_in_same_transaction": 0,
@@ -270,7 +270,7 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
                     first_user.append(first_receiver)
                 
 
-                
+
                 # check if the SC sends to another user
                 if inner_row["from"] == sc_input and inner_row["to"] != user:
                     ####print("SC sends to another user in the same transaction")
@@ -353,7 +353,7 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
                 # joining without investing
                 # first interaction and event happens but not value is sent
                 if address_balance[user]["first_interaction_as_sender"] == None:
-                    counts["count_other_paths"]["joins_without_investing"] += 1
+                    counts["count_zero_sending_paths"]["joins_without_investing"] += 1
                 
                 # add timestamp for first interaction as sender
                 if address_balance[user]["first_interaction_as_sender"] == None:
@@ -361,12 +361,12 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
                     ##print("First interaction of user: ", user)
                 
                 # path of no value transactions
-                counts["count_other_paths"]["sends_zero_to_SC"] += 1
+                counts["count_zero_sending_paths"]["sends_zero_to_SC"] += 1
 
                 # Does SC got triggered to send?
                 # if the SC sends to another user like in 0xa068bdda7b9f597e8a2eb874285ab6b864836cb8e48a1b6fccb0150bf44f5592 #coinbase ODER 0xa068bdda7b9f597e8a2eb874285ab6b864836cb8e48a1b6fccb0150bf44f5592 chicken
                 # same hash should have callvalue > 0 and from = SC and to = user
-                innerloop_for_same_tx_hash(i, events, row["hash"], "count_other_paths", None)
+                innerloop_for_same_tx_hash(i, events, row["hash"], "count_zero_sending_paths", None)
                 
                 
     # print initial_investment_to_Sc_by_EOA
@@ -374,7 +374,7 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     # bedeuted es jetzt bei coinbase {'initial_investment_to_Sc_by_EOA': 156, 'Sc_sends_to_another_user_in_same_transaction': 0, 'Sc_sends_to_multiple_users_in_same_transaction': 0, 'SC_does_not_send_to_others_in_same_transaction': 156, 'Internal_Upgrade_Event': 0}
     # wenn alles 0 ist, dass es kein Ponzi ist? die Überweisung endet halt nur vor erst hier. Kann ja durch 0 callvalue noch getriggert werden
     
-    print(counts["count_other_paths"])
+    print(counts["count_zero_sending_paths"])
 
     print(counts["counter_user_sends_again_paths"])
 
@@ -382,6 +382,7 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     # Step 4: Calculate the ratios
     ###Ratios
     
+    #Ratio of directly send to others
     ratio_initial_not_send_all = counts["count_initial_paths"]["SC_does_not_send_to_others_in_same_transaction"] / counts["count_initial_paths"]["initial_investment_to_Sc_by_EOA"]
     print("Initial investment: not directly sent to others ",ratio_initial_not_send_all)
 
@@ -389,15 +390,15 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     print("Initial investment: directly sent to others ",ratio_initial_between_directly_and_all)
     
     if ratio_initial_between_directly_and_all < 0.5:
-        print("Ratio is less than 50%") # probably not tree ponzi
+        print("Ratio of directly send to others is less than 50%") # probably not ponzi
     elif ratio_initial_between_directly_and_all > 0.8:
-        print("Ratio is higher than 80%: maybe ponzi") # looks like ponzi structure because send directly to others
+        print("Ratio of directly send to others is higher than 80%: maybe ponzi") # looks like ponzi structure because send directly to others
     else:
-        print("between 50 and 80%")
+        print("Ratio of directly send to others between 50 and 80%")
 
     # Ratio of: all tx with ether send to the SC from EOA / all tx to the SC from EOA (also 0 value tx)
-    ratio_tx_with_eth_and_all_tx = (counts["count_initial_paths"]["initial_investment_to_Sc_by_EOA"] + counts["counter_user_sends_again_paths"]["invests_again"]) / (counts["count_initial_paths"]["initial_investment_to_Sc_by_EOA"] + counts["counter_user_sends_again_paths"]["invests_again"] + counts["count_other_paths"]["sends_zero_to_SC"])
-    print(ratio_tx_with_eth_and_all_tx)
+    ratio_tx_with_eth_and_all_tx = (counts["count_initial_paths"]["initial_investment_to_Sc_by_EOA"] + counts["counter_user_sends_again_paths"]["invests_again"]) / (counts["count_initial_paths"]["initial_investment_to_Sc_by_EOA"] + counts["counter_user_sends_again_paths"]["invests_again"] + counts["count_zero_sending_paths"]["sends_zero_to_SC"])
+    print("ratio_tx_with_eth_and_all_tx", ratio_tx_with_eth_and_all_tx)
     # if this is 1 it means that all transactions to the SC are with value -> sound like a Ponzi
     #only values?
     if ratio_tx_with_eth_and_all_tx == 1:
@@ -409,7 +410,48 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     else: 
         print("Less than 50% of all transactions to the SC are with value")
 
-    #TODO here are all addresess before getting kicked
+    # ratio counter_sending_to_previous_user
+    ratio_tx_send_to_previous_and_all_value_tx = (counts["count_initial_paths"]["counter_sending_to_previous_user"] + counts["counter_user_sends_again_paths"]["counter_sending_to_previous_user"]) / (counts["count_initial_paths"]["initial_investment_to_Sc_by_EOA"] + counts["counter_user_sends_again_paths"]["invests_again"])
+    print("ratio_tx_send_to_previous_and_all_value_tx ", ratio_tx_send_to_previous_and_all_value_tx)
+    if ratio_tx_send_to_previous_and_all_value_tx > 0.5:
+        print("More than 50% of all transactions are sending to the previous user") # probably chain
+    elif ratio_tx_send_to_previous_and_all_value_tx > 0.2 and ratio_tx_send_to_previous_and_all_value_tx <= 0.5:
+        print("More than 20% and less than 50% of all transactions are sending to the previous user")
+    else:
+        print("Less than 20% of all transactions are sending to the previous user") # just no chain but maybe tree?
+
+    # and to counts["count_initial_paths"]["sc_sends_to_first_user"]
+    ratio_tx_send_to_first_user_and_all_value_tx = (counts["count_initial_paths"]["sc_sends_to_first_user"] + counts["counter_user_sends_again_paths"]["sc_sends_to_first_user"]) / (counts["count_initial_paths"]["initial_investment_to_Sc_by_EOA"] + counts["counter_user_sends_again_paths"]["invests_again"])
+    print("ratio_tx_send_to_first_user_and_all_value_tx ", ratio_tx_send_to_first_user_and_all_value_tx)
+    if ratio_tx_send_to_first_user_and_all_value_tx > 0.5:
+        print("More than 50% of all transactions are sending to the first user") # probably ponzi
+    elif ratio_tx_send_to_first_user_and_all_value_tx > 0.2 and ratio_tx_send_to_first_user_and_all_value_tx <= 0.5:
+        print("More than 20% and less than 50% of all transactions are sending to the first user") # maybe ponzi orange, or just fee for developer
+    else:
+        print("Less than 20% of all transactions are sending to the first user") # just no initial user share. but could still be ponzi
+
+
+
+    # TODO counts["count_zero_sending_paths"]
+    # etherdoubler sends back by triggering via  sends_zero_to_SC'
+    #  sc_sends_to_iniating_user  
+    ratio_initate_outcashing_and_all_zero_sendings = counts["count_zero_sending_paths"]["sc_sends_to_iniating_user"]/counts["count_zero_sending_paths"]["sends_zero_to_SC"]
+    print("ratio_initate_outcashing_and_all_zero_sendings", ratio_initate_outcashing_and_all_zero_sendings)
+
+    # sc_sends_to_first_user
+    ratio_sends_to_first_user_and_all_zero_sendings = counts["count_zero_sending_paths"]["sc_sends_to_first_user"]/counts["count_zero_sending_paths"]["sends_zero_to_SC"]
+    print("ratio_sends_to_first_user_and_all_zero_sendings", ratio_sends_to_first_user_and_all_zero_sendings)
+
+    # first_user_triggers_to_pay_out
+    ratio_first_user_triggers_to_pay_out_and_all_zero_sendings = counts["count_zero_sending_paths"]["first_user_triggers_to_pay_out"]/counts["count_zero_sending_paths"]["sends_zero_to_SC"]
+    print("ratio_first_user_triggers_to_pay_out_and_all_zero_sendings", ratio_first_user_triggers_to_pay_out_and_all_zero_sendings)
+
+
+
+
+
+
+    #TODO here are all addresess before getting kicked because they have no value transactions
     howmany = 0
     for address in address_balance:
         howmany += 1
@@ -564,7 +606,7 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
 
 
     #R3
-    # each investor makes profit if he is not the last investor/ new investors send ENOUGH ether to the SC after his investment
+    # each investor makes profit if new investors send ENOUGH ether to the SC after his investment
     # unlucky gamers in casino should still lose money -> rules out R3
 
 

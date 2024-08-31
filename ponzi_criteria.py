@@ -148,6 +148,24 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     first_input = first_row["input"]
     first_user = []
     address_dict = helper.open_address_file(folder_path, filename_without_extension)
+    #"Traffic Light" for detection of Ponzi schemes
+    scam_signal = {"R1": None,
+                   "R2": None,
+                   "R3": None,
+                   "R4": None,
+                   "A_percentage_of_profitable_users": None,
+                   "A_median_profit": None,
+                   "A_invested_amounts_frequency": None,
+                   "P_directly_send_to_others": None,
+                   "P_is_ether_transfer_heavy": None,
+                   "P_is_often_send_to_previous_user": None,
+                   "P_is_often_send_to_the_first_user": None,
+                   "zero_tx_used_to_pay_out": None,
+                   "zero_tx_used_to_payout_first_user": None,
+                   "P_most_of_zero_tx_are_from_first_user": None,
+                   "P_withdrawal_function_just_from_first_user": None
+                   }
+
 
     # Regular expression pattern for Ethereum address
     address_pattern = r"^(0x)?[0-9a-fA-F]{40}$"
@@ -268,6 +286,7 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
                 # save the first receiver of the first sc sending
                 if previous_user_id == None and inner_row["from"] == sc_input:
                     first_receiver = inner_row["to"]
+                    print(" added first receiver(SC or EOA) as first user", first_receiver)
                     first_user.append(first_receiver)
                 
 
@@ -393,10 +412,13 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     
     if ratio_initial_between_directly_and_all < 0.5:
         print("Ratio of directly send to others is less than 50%") # probably not ponzi
+        scam_signal["P_directly_send_to_others"] = "Green"
     elif ratio_initial_between_directly_and_all > 0.8:
         print("Ratio of directly send to others is higher than 80%: maybe ponzi") # looks like ponzi structure because send directly to others
+        scam_signal["P_directly_send_to_others"] = "Red"
     else:
         print("Ratio of directly send to others between 50 and 80%")
+        scam_signal["P_directly_send_to_others"] = "Orange"
 
     # Ratio of: all tx with ether send to the SC from EOA / all tx to the SC from EOA (also 0 value tx)
     ratio_tx_with_eth_and_all_tx = (counts["count_initial_paths"]["initial_investment_to_Sc_by_EOA"] + counts["counter_user_sends_again_paths"]["invests_again"]) / (counts["count_initial_paths"]["initial_investment_to_Sc_by_EOA"] + counts["counter_user_sends_again_paths"]["invests_again"] + counts["count_zero_sending_paths"]["sends_zero_to_SC"])
@@ -405,49 +427,84 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     #only values?
     if ratio_tx_with_eth_and_all_tx == 1:
         print("All transactions to the SC are with value: probably Ponzi")
+        scam_signal["P_is_ether_transfer_heavy"] = "Red"
     elif ratio_tx_with_eth_and_all_tx > 0.8:
         print("More than 80% of all transactions to the SC are with value: probably Ponzi")
+        scam_signal["P_is_ether_transfer_heavy"] = "Red"
     elif ratio_tx_with_eth_and_all_tx > 0.5:
         print("More than 50% of all transactions to the SC are with value: maybe Ponzi")
+        scam_signal["P_is_ether_transfer_heavy"] = "Orange"
     else: 
         print("Less than 50% of all transactions to the SC are with value")
+        scam_signal["P_is_ether_transfer_heavy"] = "Green"
 
     # ratio counter_sending_to_previous_user
     ratio_tx_send_to_previous_and_all_value_tx = (counts["count_initial_paths"]["counter_sending_to_previous_user"] + counts["counter_user_sends_again_paths"]["counter_sending_to_previous_user"]) / (counts["count_initial_paths"]["initial_investment_to_Sc_by_EOA"] + counts["counter_user_sends_again_paths"]["invests_again"])
     print("ratio_tx_send_to_previous_and_all_value_tx ", ratio_tx_send_to_previous_and_all_value_tx)
     if ratio_tx_send_to_previous_and_all_value_tx > 0.5:
         print("More than 50% of all transactions are sending to the previous user") # probably chain
+        scam_signal["P_is_often_send_to_previous_user"] = "Red"
     elif ratio_tx_send_to_previous_and_all_value_tx > 0.2 and ratio_tx_send_to_previous_and_all_value_tx <= 0.5:
         print("More than 20% and less than 50% of all transactions are sending to the previous user")
+        scam_signal["P_is_often_send_to_previous_user"] = "Orange"
     else:
         print("Less than 20% of all transactions are sending to the previous user") # just no chain but maybe tree?
+        scam_signal["P_is_often_send_to_previous_user"] = "Green"
 
-    # and to counts["count_initial_paths"]["sc_sends_to_first_user"]
+    # ratio to first user counts["count_initial_paths"]["sc_sends_to_first_user"]
     ratio_tx_send_to_first_user_and_all_value_tx = (counts["count_initial_paths"]["sc_sends_to_first_user"] + counts["counter_user_sends_again_paths"]["sc_sends_to_first_user"]) / (counts["count_initial_paths"]["initial_investment_to_Sc_by_EOA"] + counts["counter_user_sends_again_paths"]["invests_again"])
     print("ratio_tx_send_to_first_user_and_all_value_tx ", ratio_tx_send_to_first_user_and_all_value_tx)
-    if ratio_tx_send_to_first_user_and_all_value_tx > 0.5:
-        print("More than 50% of all transactions are sending to the first user") # probably ponzi
-    elif ratio_tx_send_to_first_user_and_all_value_tx > 0.2 and ratio_tx_send_to_first_user_and_all_value_tx <= 0.5:
-        print("More than 20% and less than 50% of all transactions are sending to the first user") # maybe ponzi orange, or just fee for developer
+    if ratio_tx_send_to_first_user_and_all_value_tx > 0.2:
+        print("More than 20% of all transactions are sending to the first user") # probably ponzi
+        scam_signal["P_is_often_send_to_the_first_user"] = "Red"
+    elif ratio_tx_send_to_first_user_and_all_value_tx > 0.1 and ratio_tx_send_to_first_user_and_all_value_tx <= 0.2:
+        print("More than 10% and less than 20% of all transactions are sending to the first user") # maybe ponzi orange, or just fee for developer
+        scam_signal["P_is_often_send_to_the_first_user"] = "Orange"
     else:
-        print("Less than 20% of all transactions are sending to the first user") # just no initial user share. but could still be ponzi
+        print("Less than 10% of all transactions are sending to the first user") # just no initial user share. but could still be ponzi
+        scam_signal["P_is_often_send_to_the_first_user"] = "Green"
 
 
 
-    # TODO counts["count_zero_sending_paths"]
+    # sending zero path: counts["count_zero_sending_paths"]
     # etherdoubler sends back by triggering via  sends_zero_to_SC'
-    #  sc_sends_to_iniating_user  
     if counts["count_zero_sending_paths"]["sc_sends_to_iniating_user"] > 0:
+        
+        # user who iniates this zero value transaction triggers a withdrawal to his address  
         ratio_initate_outcashing_and_all_zero_sendings = counts["count_zero_sending_paths"]["sc_sends_to_iniating_user"]/counts["count_zero_sending_paths"]["sends_zero_to_SC"]
         print("ratio_initate_outcashing_and_all_zero_sendings", ratio_initate_outcashing_and_all_zero_sendings)
+        if ratio_initate_outcashing_and_all_zero_sendings > 0.2:
+            scam_signal["zero_tx_used_to_pay_out"] = "Red"
+        elif ratio_initate_outcashing_and_all_zero_sendings > 0.1 and ratio_initate_outcashing_and_all_zero_sendings <= 0.2:
+            scam_signal["zero_tx_used_to_pay_out"] = "Orange"
+        else:# <10%
+            scam_signal["zero_tx_used_to_pay_out"] = "Green"
 
         # sc_sends_to_first_user
         ratio_sends_to_first_user_and_all_zero_sendings = counts["count_zero_sending_paths"]["sc_sends_to_first_user"]/counts["count_zero_sending_paths"]["sends_zero_to_SC"]
         print("ratio_sends_to_first_user_and_all_zero_sendings", ratio_sends_to_first_user_and_all_zero_sendings)
+        if ratio_sends_to_first_user_and_all_zero_sendings > 0.2:
+            scam_signal["zero_tx_used_to_payout_first_user"] = "Red"
+        elif ratio_sends_to_first_user_and_all_zero_sendings > 0.1 and ratio_sends_to_first_user_and_all_zero_sendings <= 0.2:
+            scam_signal["zero_tx_used_to_payout_first_user"] = "Orange"
+        else:
+            scam_signal["zero_tx_used_to_payout_first_user"] = "Green"
+        
 
         # first_user_triggers_to_pay_out
         ratio_first_user_triggers_to_pay_out_and_all_zero_sendings = counts["count_zero_sending_paths"]["first_user_triggers_to_pay_out"]/counts["count_zero_sending_paths"]["sends_zero_to_SC"]
         print("ratio_first_user_triggers_to_pay_out_and_all_zero_sendings", ratio_first_user_triggers_to_pay_out_and_all_zero_sendings)
+        if ratio_first_user_triggers_to_pay_out_and_all_zero_sendings > 0.2:
+            print("More than 20% of all zero sending transactions are triggered by the first user")#withdrawals mainly from the first user
+            scam_signal["P_most_of_zero_tx_are_from_first_user"] = "Red"
+        elif ratio_first_user_triggers_to_pay_out_and_all_zero_sendings > 0.1 and ratio_first_user_triggers_to_pay_out_and_all_zero_sendings <= 0.2:
+            scam_signal["P_most_of_zero_tx_are_from_first_user"] = "Orange"
+        else:
+            scam_signal["P_most_of_zero_tx_are_from_first_user"] = "Green"
+
+        if ratio_first_user_triggers_to_pay_out_and_all_zero_sendings == ratio_sends_to_first_user_and_all_zero_sendings and ratio_sends_to_first_user_and_all_zero_sendings == ratio_initate_outcashing_and_all_zero_sendings and ratio_initate_outcashing_and_all_zero_sendings !=0:
+            print("All triggered withdrawals are from the first user")
+            scam_signal["P_withdrawal_function_just_from_first_user"] = "Red"
     else:
         print("No zero sending paths")
 
@@ -513,7 +570,16 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     else:
         # could be Ponzi if more requirements are met
         print("Most addresses are sending ether to the SC. This is a first indicator that this Contract COULD be Ponzi scheme.(R1)")
-    #TODO percentage_of_users_with_no_input < 10 % ROT; < 50% ORANGE; < 90% GREEN
+    # percentage_of_users_with_no_input < 10 % ROT; < 50%/or likehood ORANGE; < 90% GREEN
+    #scam_signal
+    if percentage_of_users_with_no_input < 0.1:
+        scam_signal["R1"] = "Red"
+    elif percentage_of_users_with_no_input >= 0.1 and percentage_of_users_with_no_input < likehood_threshold:
+        scam_signal["R1"] = "Orange"
+    else:
+        scam_signal["R1"] = "Green"
+    
+
 
     # calculate the profit of each user except the main SC
     # The profit of a user is the ether received minus the ether invested.
@@ -524,10 +590,18 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     median_profit = sorted(user_profits.values())[len(user_profits) // 2]
     median_profit_in_eth = wei_to_ether(median_profit)
     print(f"The median profit of users is: {median_profit_in_eth} ETH")
+    if median_profit > 0:
+        print("The median profit of users is positive. This is a strong indicator that this Contract is NOT a Ponzi scheme.")
+        scam_signal["A_median_profit"] = "Green"
+    elif median_profit == 0:
+        scam_signal["A_median_profit"] = "Orange"
+    else:
+        print("The median profit of users is negative. This is a strong indicator that this Contract is a Ponzi scheme.")
+        scam_signal["A_median_profit"] = "Red"
     
     
 
-    # Zusatz Wie oft welche Summe vorkommt
+    # Addition: Wie oft welche Summe vorkommt
     # check if users invest the same in most cases
     # check with which frequency the users invest the same amount of ether
    
@@ -558,9 +632,12 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     if top_5_percentage > likehood_threshold:
         print(f"The top 5 frequencies of invested amounts account for more than {likehood_threshold} of all non-zero invested occurrences. This is a strong indicator that this Contract is a Ponzi scheme because its a implemented logic.")
         # mostly the same amount invested, could be Ponzi if more requirements are met
+        scam_signal["A_invested_amounts_frequency"] = "Red"
+    elif top_5_percentage >= 0.5 and top_5_percentage <= likehood_threshold:
+        scam_signal["A_invested_amounts_frequency"] = "Orange"
     else:
         print("sums are different")
-        # 
+        scam_signal["A_invested_amounts_frequency"] = "Green"
 
 
 
@@ -578,24 +655,29 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     print(f"The timestamp of the first transaction of the user who invested the most ether is: {timestamp_of_user_most_invested}")
     if last_timestamp == timestamp_of_user_most_invested and profit_of_user_most_invested < 0:
         # handover scheme -> Ponzi Red
+        scam_signal["R2"] = "Red"
         print("The last timestamp is equal to the timestamp of the user who invested the most ether and this big investor loses money. This could be a strong indicator that this Contract is a Ponzi scheme.(R2)")#Red
     elif last_timestamp != timestamp_of_user_most_invested and profit_of_user_most_invested < 0:
-        # Rules out R2-> no ponzi
+        
         # external investor makes a loss
         print(" Could be an external source which pays off with own funds(R2)")
         # How big is the loss? Vergleich von von input zu output?
-        if address_balance[user_most_invested]["received"] / address_balance[user_most_invested]["invested"] > likehood_threshold:
+        if address_balance[user_most_invested]["received"] / address_balance[user_most_invested]["invested"] > 0.1:
             print("But this investor also gets a lot of ether back. perhaps not an external one after all  (R2)")#ORANGE
+            scam_signal["R2"] = "Orange"
         else:
+            # Rules out R2-> no ponzi
             print("Should be an external investor since he makes a loss and does not get much back (R2)")#Green
+            scam_signal["R2"] = "Green"
     else: # big investor also makes profit
         # could also be Ponzi if more requirements are met
         print("Cant say anything about the contract(R2) since the biggest investor makes profit.")# Orange / neutral
+        scam_signal["R2"] = "Orange"
     #TODO check whether this address is a sc?
     
 
 
-    # zusatz?
+    # addition?A_percentage_of_profitable_users
     # calculate how many users have a profit greater than 0
     profitable_users = [address for address in user_profits if user_profits[address] > 0]
     number_of_profitable_users = len(profitable_users) # this excludes all the profit/loss = 0 users
@@ -605,8 +687,12 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
         print("The percentage of profitable users is higher than the threshold of 66.66%. This means most of the users in this Contract are making a profit. This is a strong indicator that this Contract is NOT a Ponzi scheme. ")
         # mostly profitable addresses/users
         # or in a early phase of Ponzi where almost all like in chain win?
+        scam_signal["A_percentage_of_profitable_users"] = "Green"
+    elif percentage_of_profitable_users >= 0.5 and percentage_of_profitable_users <= likehood_threshold:
+        scam_signal["A_percentage_of_profitable_users"] = "Orange"
     else:
         print("Most users are not profitable. This is a first indicator that this Contract COULD be Ponzi scheme.")
+        scam_signal["A_percentage_of_profitable_users"] = "Red"
 
 
     #R3
@@ -625,7 +711,7 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
             anzahl_profits_bis_jetzt += 1
         
         user_rataio = anzahl_profits_bis_jetzt/anzahl_user_bis_jetzt
-        print(user_rataio)
+        #print(user_rataio)
         if last_ratio > user_rataio:
             how_ofte_does_ratio_sink += 1
 
@@ -634,15 +720,14 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     ratio_of_sinking_profit_takers_with_user_growth = how_ofte_does_ratio_sink/anzahl_user_bis_jetzt
     print("ratio_of_sinking_profit_takers_with_user_growth", ratio_of_sinking_profit_takers_with_user_growth)
     if ratio_of_sinking_profit_takers_with_user_growth > 0.5:
-        print("When we check the profability of the users we see that the ratio of profitable users is sinking with the user growth (R3)")
-
-        
-
-            
-
-           
-
-
+        print("When we check the profability of the users we see that the ratio of profitable users is sinking with reaching the end of the user growth (R3)")
+        scam_signal["R3"] = "Red"
+    elif ratio_of_sinking_profit_takers_with_user_growth == 0.5:
+        print("The ratio of profitable users is constant with the user growth (R3)")
+        scam_signal["R3"] = "Orange"
+    else:
+        print("The ratio of profitable users is increasing with the user growth (R3)")
+        scam_signal["R3"] = "Green"
 
 
 
@@ -674,6 +759,7 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     prof_user_with_timestamp = [address for address in user_profits if user_profits[address] > 0 and address_balance[address]["first_transaction"] is not None]
     if not prof_user_with_timestamp:
         print("There are no profitable users with investment-timestamps. (R4) ") # Orange
+        scam_signal["R4"] = "Orange"
         # in scams should be at least one user who makes profit -> or its just the one without timestamp->hardcoded?
         timestamps_profit = None # just for plotting_tx
     else:
@@ -692,8 +778,10 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
         # check if the average timestamp of unprofitable users is greater than the average timestamp of profitable users
         if average_timestamp > average_timestamp_profit:
             print("The average entry timestamp of unprofitable users is greater than the average entry timestamp of profitable users. Likely Ponzi. (R4)")#Red
+            scam_signal["R4"] = "Red"
         else:
             print("The average entry timestamp of unprofitable users is not greater than the average entry timestamp of profitable users. Likely not Ponzi. (R4)")#green
+            scam_signal["R4"] = "Green"
     
 
 
@@ -745,8 +833,15 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     """
 
 
-
-
+    print(scam_signal)
+    # save the scam signal as txt file
+    with open(f"output/scam_signal_{filename_without_extension}.txt", "w") as f:
+        for key, value in scam_signal.items():
+            f.write(f"{key}: {value}\n")
+        
+        #calculation of the scam signal here add the results
+        #f.write("Potential scam :\n")
+    
     # return output if scam as file?
     return address_balance
 

@@ -163,7 +163,8 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
                    "zero_tx_used_to_pay_out": None,
                    "zero_tx_used_to_payout_first_user": None,
                    "P_most_of_zero_tx_are_from_first_user": None,
-                   "P_withdrawal_function_just_from_first_user": None
+                   "P_withdrawal_function_just_from_first_user": None,
+                   "is_chain_shaped" : None
                    }
 
 
@@ -228,6 +229,16 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
                     "counter_sending_to_previous_user" : 0
                     }
     counts["counter_user_sends_again_paths"] = {"invests_again": 0,
+                    "Sc_sends_to_another_user_in_same_transaction": 0,
+                    "Sc_sends_to_multiple_users_in_same_transaction": 0,
+                    "SC_does_not_send_to_others_in_same_transaction": 0,
+                    "Internal_Upgrade_Event": 0,
+                    "sc_sends_to_iniating_user" : 0,
+                    "sc_sends_to_first_user" : 0,
+                    "first_user_triggers_to_pay_out" : 0,
+                    "counter_sending_to_previous_user" : 0
+                    }
+    counts["hide_behind_own_SC_path"] = {"eoa_triggers_other_SC_to_interact": 0,  "joins_without_investing": 0,
                     "Sc_sends_to_another_user_in_same_transaction": 0,
                     "Sc_sends_to_multiple_users_in_same_transaction": 0,
                     "SC_does_not_send_to_others_in_same_transaction": 0,
@@ -315,6 +326,40 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
                 # if there is a previous_user_id and the receiver is the previous and its not the first line of tx where the SC is the receiver
                 if previous_user_id != None and inner_row["to"] == previous_user_id and inner_row["to"] != sc_input:
                     counts[pathing_type]["counter_sending_to_previous_user"] += 1
+
+                # could be that an EOA triggers his SC to send to our MAIN Sc under investigation (example: 0xeb7ae06ee6f30535f1446252a7f6a39e0151a3f4cded34ff9d8dbee4f162ff79)
+                #if(row["from_Type"] == "CA" and row["to"] == sc_input): 
+                #    user_order.append(user)
+
+                # check chain for user_order
+                if inner_row["from"] == sc_input and pathing_type != "count_zero_sending_paths" : #skip the first part of the loop where sc is receiver
+                    if len(user_order) > 0:
+                        if inner_row["to"] == user_order[0]:
+                            #print(inner_row["hash"])
+                            user_order.pop(0)
+                            #if len(user_order) > 0:
+                            #    print("new User order 0 is: ", user_order[0])
+                            user_order_correct["correct"] += 1
+                        
+                        else:
+                            #sometimes we have to check the second user in the list
+                            if len(user_order) > 1:
+                                if inner_row["to"] == user_order[1]:
+                                    #print(inner_row["hash"])
+                                    user_order.pop(1)
+                                    #if len(user_order) > 1:
+                                    #    print("new User order 1 is: ", user_order[1])
+                                    user_order_correct["correct"] += 1
+                                else:
+                                    #print(inner_row["hash"])
+                                    #print("User order is not correct")
+                                    user_order_correct["incorrect"] += 1
+                                    user_order.pop(-1)
+                            else:
+                                user_order_correct["incorrect"] += 1
+                    else:
+                        user_order_correct["incorrect"] += 1
+                            
                 
             
             # check if events
@@ -327,6 +372,9 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     
     ####Main loop
     previous_user_id = None
+    user_order = []
+    user_order_correct = {"correct": 0,
+                          "incorrect": 0}
     # iterate through the events
     for i, row in events.iterrows():
         user = row["from"]
@@ -342,6 +390,7 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
                 # this means its the initial investment of a user to the Dapp (user A initiates transaction)
                 # check if from_Typ is a contract or an EOA
                 if(row["from_Type"] == "EOA"): # so it cant be the Dapps first sending transaction
+                    user_order.append(user)
                     ####print("Sender is a EOA: ", user)
                     #combined_df.loc[i+1, "concept:name"] = "user A initiates Transaction"-> idea to manipulate the events-> see branch
                     counts["count_initial_paths"]["initial_investment_to_Sc_by_EOA"] += 1
@@ -356,6 +405,7 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
             elif address_balance[user]["first_transaction"] != None:
                 if (row["from_Type"] == "EOA"):
                     # its an EOA
+                    user_order.append(user)
                     ###print("investor is multiple times investing: ", user)
                     counts["counter_user_sends_again_paths"]["invests_again"] += 1
                     # TODO was passiert wenn ein user mehrmals investiert? -> wie wird das in der Abfgole berücksichtigt?
@@ -388,8 +438,18 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
                 # same hash should have callvalue > 0 and from = SC and to = user
                 innerloop_for_same_tx_hash(i, events, row["hash"], "count_zero_sending_paths", previous_user_id)
                 #previous_user_id = user
+            
+            # user sends to other SC:else
+            else:
+               if i + 1 < len(events): #following is just possible if we are not at the end of the table
+                # since the "to" coloumn is empty in events, we can filter them with the next line
+                #   user sends to his SC which triggers our main SC
+                if events.iloc[i+1]["to"] == sc_input:
+                    counts["hide_behind_own_SC_path"]["eoa_triggers_other_SC_to_interact"] += 1
+                    innerloop_for_same_tx_hash(i, events, row["hash"], "hide_behind_own_SC_path", previous_user_id)# this values are not counted in the zero sending paths because its sending to another SC
+
                 
-                
+    print("user order ", user_order_correct)
     # print initial_investment_to_Sc_by_EOA
     print(counts["count_initial_paths"])
     # bedeuted es jetzt bei coinbase {'initial_investment_to_Sc_by_EOA': 156, 'Sc_sends_to_another_user_in_same_transaction': 0, 'Sc_sends_to_multiple_users_in_same_transaction': 0, 'SC_does_not_send_to_others_in_same_transaction': 156, 'Internal_Upgrade_Event': 0}
@@ -398,6 +458,8 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     print(counts["count_zero_sending_paths"])
 
     print(counts["counter_user_sends_again_paths"])
+
+    print(counts["hide_behind_own_SC_path"])
 
     print("first users after loop",first_user)
     # Step 4: Calculate the ratios
@@ -410,17 +472,18 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     ratio_initial_between_directly_and_all = 1 - ratio_initial_not_send_all
     print("Initial investment: directly sent to others ",ratio_initial_between_directly_and_all)
     
-    if ratio_initial_between_directly_and_all < 0.5:
-        print("Ratio of directly send to others is less than 50%") # probably not ponzi
+    if ratio_initial_between_directly_and_all < 0.25:
+        print("Ratio of directly send to others is less than 25%") # probably not ponzi
         scam_signal["P_directly_send_to_others"] = "Green"
-    elif ratio_initial_between_directly_and_all > 0.8:
-        print("Ratio of directly send to others is higher than 80%: maybe ponzi") # looks like ponzi structure because send directly to others
+    elif ratio_initial_between_directly_and_all > 0.5:
+        print("Ratio of directly send to others is higher than 50%: maybe ponzi") # looks like ponzi structure because send directly to others
         scam_signal["P_directly_send_to_others"] = "Red"
     else:
-        print("Ratio of directly send to others between 50 and 80%")
+        print("Ratio of directly send to others between 50 and 25%")
         scam_signal["P_directly_send_to_others"] = "Orange"
 
     # Ratio of: all tx with ether send to the SC from EOA / all tx to the SC from EOA (also 0 value tx)
+    #TODO Should i add the zero path?
     ratio_tx_with_eth_and_all_tx = (counts["count_initial_paths"]["initial_investment_to_Sc_by_EOA"] + counts["counter_user_sends_again_paths"]["invests_again"]) / (counts["count_initial_paths"]["initial_investment_to_Sc_by_EOA"] + counts["counter_user_sends_again_paths"]["invests_again"] + counts["count_zero_sending_paths"]["sends_zero_to_SC"])
     print("ratio_tx_with_eth_and_all_tx", ratio_tx_with_eth_and_all_tx)
     # if this is 1 it means that all transactions to the SC are with value -> sound like a Ponzi
@@ -448,7 +511,7 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
         print("More than 20% and less than 50% of all transactions are sending to the previous user")
         scam_signal["P_is_often_send_to_previous_user"] = "Orange"
     else:
-        print("Less than 20% of all transactions are sending to the previous user") # just no chain but maybe tree?
+        print("Less than 20% of all transactions are sending to the previous user") # just no chain but maybe tree-> hard to track chain with this method
         scam_signal["P_is_often_send_to_previous_user"] = "Green"
 
     # ratio to first user counts["count_initial_paths"]["sc_sends_to_first_user"]
@@ -502,15 +565,26 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
         else:
             scam_signal["P_most_of_zero_tx_are_from_first_user"] = "Green"
 
+        #withdrawal function just from first user
         if ratio_first_user_triggers_to_pay_out_and_all_zero_sendings == ratio_sends_to_first_user_and_all_zero_sendings and ratio_sends_to_first_user_and_all_zero_sendings == ratio_initate_outcashing_and_all_zero_sendings and ratio_initate_outcashing_and_all_zero_sendings !=0:
             print("All triggered withdrawals are from the first user")
             scam_signal["P_withdrawal_function_just_from_first_user"] = "Red"
     else:
         print("No zero sending paths")
 
-
-
-
+    #is chain?
+    if user_order_correct["correct"] != 0:
+        chain_detection = user_order_correct["correct"] / (user_order_correct["correct"] + user_order_correct["incorrect"])
+        print("chain_detection", chain_detection)
+        if chain_detection > likehood_threshold:
+            print("Chain detection is higher than the threshold and therefore the contact is likely a chain shaped Ponzi scheme")
+            scam_signal["is_chain_shaped"] = "Red"
+        elif chain_detection <= likehood_threshold and chain_detection >= 0.2:
+            print("Chain detection is between 20% and the threshold and therefore the contact is likely a tree shaped Ponzi scheme")
+            scam_signal["is_chain_shaped"] = "Orange"
+        else:
+            print("Chain detection is lower than 20% and therefore the contact is likely a linear shaped Ponzi scheme")
+            scam_signal["is_chain_shaped"] = "Green"
 
     #TODO here are all addresess before getting kicked because they have no value transactions
     howmany = 0
@@ -832,15 +906,113 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     print(address_balance["0x4aaa7083535965d1cdd44d1407dcb11eec3f576d"]["first_transaction"].isoformat())
     """
 
-
+    # scam signal output
+    print("######Conclusion######")
     print(scam_signal)
+    
+    # Bartoletti_Reqs
+    # List of keys to check
+    keys_to_check = ['R1', 'R2', 'R3', 'R4']
+    # Count how many of the values are 'Red'
+    red_count_R = sum(1 for key in keys_to_check if scam_signal[key] == 'Red')
+    green_count_R = sum(1 for key in keys_to_check if scam_signal[key] == 'Green')
+    light_R = red_count_R - green_count_R
+
+    # Additional signals
+    keys_to_check = ['A_percentage_of_profitable_users', 'A_median_profit', 'A_invested_amounts_frequency']
+    red_count_A = sum(1 for key in keys_to_check if scam_signal[key] == 'Red')
+    green_count_A = sum(1 for key in keys_to_check if scam_signal[key] == 'Green')
+    light_A = red_count_A - green_count_A
+
+    
+
+    #zero_tx_used_to_pay_out # not for interaction like gaming and instead for payout
+    #zero_tx_used_to_payout_first_user
+    #P_most_of_zero_tx_are_from_first_user
+    # zero Value as payout trigger signals
+    keys_to_check = ['zero_tx_used_to_pay_out', 'zero_tx_used_to_payout_first_user', 'P_most_of_zero_tx_are_from_first_user']
+    red_count_zero_triggers_payout = sum(1 for key in keys_to_check if scam_signal[key] == 'Red')
+    green_count_zero_triggers_payout = sum(1 for key in keys_to_check if scam_signal[key] == 'Green')
+    light_zero_triggers_payout = red_count_zero_triggers_payout - green_count_zero_triggers_payout
+
+    #P_withdrawal_function_just_from_first_user
+    if scam_signal["P_withdrawal_function_just_from_first_user"] == "Red":
+        print("The contract is likely a Ponzi scheme based on the fact that the only user who triggers the withdrawal function is the first user.")
+
     # save the scam signal as txt file
     with open(f"output/scam_signal_{filename_without_extension}.txt", "w") as f:
         for key, value in scam_signal.items():
             f.write(f"{key}: {value}\n")
         
         #calculation of the scam signal here add the results
-        #f.write("Potential scam :\n")
+        #Bartoletti_Reqs
+        if light_R > 2: #and scam_signal["R4"] == "Red":
+            Bartoletti_Output = "The contract is likely a Ponzi scheme based on requirements R1, R2, R3 and R4 of Bartoletti et al. (2019)"
+            scam_signal["Bartoletti_Reqs"] = "Red"
+        elif light_R >= 0 and light_R <= 2:
+            Bartoletti_Output = "The contract could be a Ponzi scheme based on requirements R1, R2, R3 and R4 of Bartoletti et al. (2019)"
+            scam_signal["Bartoletti_Reqs"] = "Orange"
+        else:
+            Bartoletti_Output = "The contract is likely NOT a Ponzi scheme based on requirements R1, R2, R3 and R4 of Bartoletti et al. (2019)"
+            scam_signal["Bartoletti_Reqs"] = "Green"
+        print(Bartoletti_Output)
+        f.write(f"{Bartoletti_Output}\n")
+
+
+        # Additional signals
+        if light_A > 1:
+            Additional_Output = "The contract is likely a Ponzi scheme based on additional signals"
+            scam_signal["Additional_signals"] = "Red"
+        elif light_A >= 0 and light_A <= 1:
+            Additional_Output = "The contract could be a Ponzi scheme based on additional signals"
+            scam_signal["Additional_signals"] = "Orange"
+        else:
+            Additional_Output = "The contract is likely NOT a Ponzi scheme based on additional signals"
+            scam_signal["Additional_signals"] = "Green"
+        print(Additional_Output)
+        f.write(f"{Additional_Output}\n")
+
+
+        ## Pathing signals / process-based approach
+        # Anatomy of a Ponzi scheme
+        if scam_signal["P_is_often_send_to_previous_user"] == "Red" or scam_signal["is_chain_shaped"] == "Red":
+            is_chain = "The contract is likely a chain-shaped Ponzi scheme based on our process-based approach."
+            print(is_chain)
+            f.write(f"{is_chain}\n")
+        else: is_chain = None
+
+        if scam_signal["P_directly_send_to_others"] == "Red":
+            is_tree = "The contract is likely a tree-shaped Ponzi scheme based on our process-based approach."
+            print(is_tree)
+            f.write(f"{is_tree}\n")
+        else: is_tree = None
+        
+        #P_is_ether_transfer_heavy
+        if scam_signal["P_is_ether_transfer_heavy"] == "Red":
+            is_eth_heavy = "The contract is likely a Ponzi scheme based on the fact that most transactions to the SC are with value."
+            print(is_eth_heavy)
+            f.write(f"{is_eth_heavy}\n")
+
+        #P_is_often_send_to_the_first_user
+        if scam_signal["P_is_often_send_to_the_first_user"] == "Red":
+            does_often_send_to_first_user = "The contract is likely a Ponzi scheme based on the fact that most transactions are sent to the first user. Could be a Developer Fee."
+            print(does_often_send_to_first_user)
+            f.write(f"{does_often_send_to_first_user}\n")
+        
+        # zero Value as payout trigger signals
+        if light_zero_triggers_payout > 1:
+            Pathing_zero_triggers_payout = "The contract is likely a Ponzi scheme based on the fact that zero value transactions are used to trigger payouts."
+            print(Pathing_zero_triggers_payout)
+            f.write(f"{Pathing_zero_triggers_payout}\n")
+        
+        
+        # Overall
+        if light_R > 2 or is_chain or is_tree or light_zero_triggers_payout > 1:
+            overall = "overall the contract is likely a Ponzi scheme"
+        else:
+            overall = "overall the contract is likely NOT a Ponzi scheme"
+        print(overall)
+        f.write(f"{overall}\n")
     
     # return output if scam as file?
     return address_balance

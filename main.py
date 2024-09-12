@@ -54,16 +54,19 @@ def main():
     host = config["host"]
     input_folder_path = config["input_folder_path"]
     input_contract_file_name = config["input_contract_file_name"]
-    likehood_threshold = config["likehood_threshold"]
+    likelihood_threshold = config["likelihood_threshold"]
 
     # Set the paths for faster testing:
     # Path to log folder
-    input_folder_path = "/Users/tomfunke/Desktop/logging/locale_extraktion/inklusive_nondapp/ether_doubler_without_deployer"
+    input_folder_path = "/Users/tomfunke/Desktop/logging/locale_extraktion/inklusive_nondapp/piggy_waterfall"
+    #"/Users/tomfunke/Desktop/logging/locale_extraktion/inklusive_nondapp/ether_doubler" #with deployer
+    #"/Users/tomfunke/Desktop/logging/locale_extraktion/inklusive_nondapp/dynpyra_without_deployer" #dynpyra_without_deployer
+    #"/Users/tomfunke/Desktop/logging/locale_extraktion/inklusive_nondapp/eth_pyra_without_deployer"
     #"/Users/tomfunke/Desktop/logging/locale_extraktion/inklusive_nondapp/bunny_handover"
     #"/Users/tomfunke/Desktop/logging/locale_extraktion/inklusive_nondapp/millionmoney"
     #"/Users/tomfunke/Desktop/logging/locale_extraktion/inklusive_nondapp/piggy_waterfall"
     #"/Users/tomfunke/Desktop/logging/locale_extraktion/inklusive_nondapp/dynamicPyramid"
-    #"/Users/tomfunke/Desktop/logging/locale_extraktion/inklusive_nondapp/ethereumPyramid"
+    #"/Users/tomfunke/Desktop/logging/locale_extraktion/inklusive_nondapp/ethereumPyramid" #with deploy
     #"/Users/tomfunke/Desktop/logging/locale_extraktion/inklusive_nondapp/compound_token"
     #"/Users/tomfunke/Desktop/logging/locale_extraktion/inklusive_nondapp/yearn_finance_token"
     #"/Users/tomfunke/Desktop/logging/locale_extraktion/inklusive_nondapp/ultra_short_ether_doubler"
@@ -84,7 +87,10 @@ def main():
     
     # Just the name without the prefix and suffix (main contract_address with range withour file format)
     # example: "0x9758da9b4d001ed2d0df46d25069edf53750767a_1335983_1497934"
-    input_contract_file_name = "0xfd2487cc0e5dce97f08be1bc8ef1dce8d5988b4d_1014288_12679208" #ether_doubler -> chain
+    input_contract_file_name ="0xdcb13fa157eebf22ddc8c9aa1d6e394810de6fa3_1196017_6036811"#piggy
+    #"0xfd2487cc0e5dce97f08be1bc8ef1dce8d5988b4d_1014288_1026117" #ether doubler short
+    #"0xa9e4e3b1da2462752aea980698c335e70e9ab26c_1078846_4139113" #dynpyra_without_deployer
+    #"0x7011f3edc7fa43c81440f9f43a6458174113b162_198362_9645490" #ethpyramid_without_deployer
     #"0xfe9c69945687539fabbf531133838d9cce522a76_1078846_4139113" # bunny
     #"0xbcf935d206ca32929e1b887a07ed240f0d8ccd22_8447267_8654321" #mill
     #"0xdcb13fa157eebf22ddc8c9aa1d6e394810de6fa3_1196017_6036811"#piggy
@@ -151,7 +157,7 @@ def main():
     #ocel = pm4py.read_ocel(os.path.join(input_folder_path, 'df_ocel_events_' + input_contract_file_name + '.csv'), os.path.join(input_folder_path, 'df_ocel_objects_' + input_contract_file_name + '.csv'))
     
     # Check the Ponzi criteria
-    ponzi_criteria.check_ponzi_criteria(ocel, input_contract_file_name, input_folder_path, node_url, likehood_threshold)
+    ponzi_criteria.check_ponzi_criteria(ocel, input_contract_file_name, input_folder_path, node_url, likelihood_threshold)
 
 if __name__ == "__main__":
     main()

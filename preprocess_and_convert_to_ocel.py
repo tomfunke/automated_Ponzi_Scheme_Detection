@@ -189,8 +189,8 @@ def preprocess(format_type, trace_tree_path, events_dapp_path, value_calls_dapp_
     Filters errors & converts tables & saves them in a new file
 
     Args:
-        trace_tree_path (path): bla
-        dict_abi (dict): blaaa
+        trace_tree_path (path): 
+        dict_abi (dict): 
 
     Raises:
         ValueError: 

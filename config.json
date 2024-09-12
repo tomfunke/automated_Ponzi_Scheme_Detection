@@ -4,5 +4,5 @@
     "host": "127.0.0.1",
     "input_folder_path" : "/tomfunke/loggerV1/safes",
     "input_contract_file_name" : "0x06012c8cf97bead5deae237070f9587f8e7a266d_4605167_4754301",
-    "likehood_threshold" : 0.666
+    "likelihood_threshold" : 0.666
 }

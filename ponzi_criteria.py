@@ -134,7 +134,7 @@ def plotting_tx(timestamps_unprofit, losses, profits_profitable_with_timestamp, 
 
     return
 
-def input_output_flow(ocel, filename_without_extension, folder_path, node_url, likehood_threshold):
+def input_output_flow(ocel, filename_without_extension, folder_path, node_url, likelihood_threshold):
     # Step 1: Extract relevant events and attributes
     events = ocel.events
     objects = ocel.objects
@@ -264,7 +264,7 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
             if inner_row["hash"] != hash_of_this_tx:
                 #events.iloc[j-1]# in some transactions its just this one step and nothing more happens; j-i is the original line before we break in thi j
                 
-                # Save memory stats before breaking inner loop
+                # Save memory stats before breaking inner loop. Because its the next trannsactionn hash which is checked and therefore wrong inner loop
                 # this does not give the number of internal events and how many times the SC sends to others in the same transaction. It just counts plus 1 for each kind of trace
                 if memory_of_this_hash["counter_how_often_sc_sends_to_others"] == 0: #  means that the SC does not send to another user in the same transaction-> kann ich das benutzen als path ende?
                     counts[pathing_type]["SC_does_not_send_to_others_in_same_transaction"] += 1
@@ -576,10 +576,10 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     if user_order_correct["correct"] != 0:
         chain_detection = user_order_correct["correct"] / (user_order_correct["correct"] + user_order_correct["incorrect"])
         print("chain_detection", chain_detection)
-        if chain_detection > likehood_threshold:
+        if chain_detection > likelihood_threshold:
             print("Chain detection is higher than the threshold and therefore the contact is likely a chain shaped Ponzi scheme")
             scam_signal["is_chain_shaped"] = "Red"
-        elif chain_detection <= likehood_threshold and chain_detection >= 0.2:
+        elif chain_detection <= likelihood_threshold and chain_detection >= 0.2:
             print("Chain detection is between 20% and the threshold and therefore the contact is likely a tree shaped Ponzi scheme")
             scam_signal["is_chain_shaped"] = "Orange"
         else:
@@ -615,7 +615,7 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     sc_address = max(address_balance, key=lambda x: address_balance[x]["received"])
     print(f"The smart contract address with the most ether transfer is: {sc_address}")
 
-    which_token = helper.get_kind_of_Sc(sc_input, node_url, likehood_threshold)
+    which_token = helper.get_kind_of_Sc(sc_input, node_url, likelihood_threshold)
     if which_token == 2:
         print("The contract got doubled checked and is also no token contract")
     elif which_token == 1:
@@ -636,9 +636,9 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     total_number_of_users = len(address_balance)# only with value transaction. there more addresses with interactions but no value transactions
     percentage_of_users_with_no_input = number_of_users_with_no_input / total_number_of_users
     print(f"The percentage of users without input is : {percentage_of_users_with_no_input:.2f}")
-    if percentage_of_users_with_no_input > likehood_threshold:
+    if percentage_of_users_with_no_input > likelihood_threshold:
         # Rules out -> no ponzi
-        print(f"The percentage of users without input is higher than the threshold of {likehood_threshold}. This means most of the users in this Contract are receiving ether from the SC. This is a strong indicator that this Contract is NOT a Ponzi scheme. And that the logic is external (R1)")
+        print(f"The percentage of users without input is higher than the threshold of {likelihood_threshold}. This means most of the users in this Contract are receiving ether from the SC. This is a strong indicator that this Contract is NOT a Ponzi scheme. And that the logic is external (R1)")
         # like a exchange with an address for inputs and an address for outputs. logic is not visible (R1)
         # so there logic that the addresess invested is likely on a centralized exchange
     else:
@@ -648,7 +648,7 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     #scam_signal
     if percentage_of_users_with_no_input < 0.1:
         scam_signal["R1"] = "Red"
-    elif percentage_of_users_with_no_input >= 0.1 and percentage_of_users_with_no_input < likehood_threshold:
+    elif percentage_of_users_with_no_input >= 0.1 and percentage_of_users_with_no_input < likelihood_threshold:
         scam_signal["R1"] = "Orange"
     else:
         scam_signal["R1"] = "Green"
@@ -703,11 +703,11 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     print(f"Total non-zero invested occurrences: {total_sum}")
     print(f"Top 5 frequencies as a percentage of total: {top_5_percentage:.2f}")
     
-    if top_5_percentage > likehood_threshold:
-        print(f"The top 5 frequencies of invested amounts account for more than {likehood_threshold} of all non-zero invested occurrences. This is a strong indicator that this Contract is a Ponzi scheme because its a implemented logic.")
+    if top_5_percentage > likelihood_threshold:
+        print(f"The top 5 frequencies of invested amounts account for more than {likelihood_threshold} of all non-zero invested occurrences. This is a strong indicator that this Contract is a Ponzi scheme because its a implemented logic.")
         # mostly the same amount invested, could be Ponzi if more requirements are met
         scam_signal["A_invested_amounts_frequency"] = "Red"
-    elif top_5_percentage >= 0.5 and top_5_percentage <= likehood_threshold:
+    elif top_5_percentage >= 0.5 and top_5_percentage <= likelihood_threshold:
         scam_signal["A_invested_amounts_frequency"] = "Orange"
     else:
         print("sums are different")
@@ -757,12 +757,12 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     number_of_profitable_users = len(profitable_users) # this excludes all the profit/loss = 0 users
     percentage_of_profitable_users = number_of_profitable_users / total_number_of_users #TODO toal number of users are just the ones with value transactions
     print(f"The percentage of profitable users is: {percentage_of_profitable_users:.2f}")
-    if percentage_of_profitable_users > likehood_threshold:
+    if percentage_of_profitable_users > likelihood_threshold:
         print("The percentage of profitable users is higher than the threshold of 66.66%. This means most of the users in this Contract are making a profit. This is a strong indicator that this Contract is NOT a Ponzi scheme. ")
         # mostly profitable addresses/users
         # or in a early phase of Ponzi where almost all like in chain win?
         scam_signal["A_percentage_of_profitable_users"] = "Green"
-    elif percentage_of_profitable_users >= 0.5 and percentage_of_profitable_users <= likehood_threshold:
+    elif percentage_of_profitable_users >= 0.5 and percentage_of_profitable_users <= likelihood_threshold:
         scam_signal["A_percentage_of_profitable_users"] = "Orange"
     else:
         print("Most users are not profitable. This is a first indicator that this Contract COULD be Ponzi scheme.")
@@ -961,13 +961,13 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
 
         # Additional signals
         if light_A > 1:
-            Additional_Output = "The contract is likely a Ponzi scheme based on additional signals"
+            Additional_Output = "The contract is likely a Ponzi scheme based on additional signals."
             scam_signal["Additional_signals"] = "Red"
         elif light_A >= 0 and light_A <= 1:
-            Additional_Output = "The contract could be a Ponzi scheme based on additional signals"
+            Additional_Output = "The contract could be a Ponzi scheme based on additional signals."
             scam_signal["Additional_signals"] = "Orange"
         else:
-            Additional_Output = "The contract is likely NOT a Ponzi scheme based on additional signals"
+            Additional_Output = "The contract is likely NOT a Ponzi scheme based on additional signals."
             scam_signal["Additional_signals"] = "Green"
         print(Additional_Output)
         f.write(f"{Additional_Output}\n")
@@ -1008,9 +1008,9 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
         
         # Overall
         if light_R > 2 or is_chain or is_tree or light_zero_triggers_payout > 1:
-            overall = "overall the contract is likely a Ponzi scheme"
+            overall = "Overall the contract is likely a Ponzi scheme"
         else:
-            overall = "overall the contract is likely NOT a Ponzi scheme"
+            overall = "Overall the contract is likely NOT a Ponzi scheme"
         print(overall)
         f.write(f"{overall}\n")
     
@@ -1018,7 +1018,7 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     return address_balance
 
 
-def check_ponzi_criteria(ocel, filename_without_extension, folder_path, node_url, likehood_threshold):
+def check_ponzi_criteria(ocel, filename_without_extension, folder_path, node_url, likelihood_threshold):
     print("Start checking Ponzi criteria:")
     # firstly check the ponzi if he is a contract or an EOA: extractor gives just trace tree output, when trying to extract a EOA address without creation
 
@@ -1029,7 +1029,7 @@ def check_ponzi_criteria(ocel, filename_without_extension, folder_path, node_url
     #print(ocel.objects)
     """
 
-    input_output_flow(ocel, filename_without_extension, folder_path, node_url, likehood_threshold)
+    input_output_flow(ocel, filename_without_extension, folder_path, node_url, likelihood_threshold)
     #alignments_calculations(ocel)
 
   

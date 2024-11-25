@@ -46,7 +46,7 @@
       <incoming>Flow_07pxk40</incoming>
     </endEvent>
     <exclusiveGateway id="Gateway_03xdqde">
-      <incoming>Flow_1sq7lpb</incoming>
+      <incoming>Flow_18ividc</incoming>
       <outgoing>Flow_1pg4fjw</outgoing>
       <outgoing>Flow_1pbzs5o</outgoing>
       <outgoing>Flow_1cwfnec</outgoing>
@@ -59,18 +59,14 @@
       <incoming>Flow_11cx667</incoming>
       <outgoing>Flow_1210t1c</outgoing>
     </exclusiveGateway>
-    <exclusiveGateway id="Gateway_0xd8ymp">
-      <incoming>Flow_18ividc</incoming>
-      <outgoing>Flow_1sq7lpb</outgoing>
-    </exclusiveGateway>
     <task id="Task_1hcentk" name="Smart Contract (SC) receives Funds from User A">
       <incoming>Flow_1ytqqcd</incoming>
       <outgoing>Flow_18ividc</outgoing>
     </task>
-    <startEvent id="StartEvent_1y45yut" name="user A initiates Transaction">
+    <startEvent id="StartEvent_1y45yut" name="User A initiates Transaction">
       <outgoing>Flow_1ytqqcd</outgoing>
     </startEvent>
-    <task id="Activity_15dlxup" name="User B triggers SC to receive Funds in a new tx (collect Fees)">
+    <task id="Activity_15dlxup" name="User B triggers SC to receive Funds (e.g. collect Fees)">
       <incoming>Flow_0qjddct</incoming>
       <outgoing>Flow_11cx667</outgoing>
     </task>
@@ -87,11 +83,10 @@
     <sequenceFlow id="Flow_1yfs7ff" name="Yes" sourceRef="Gateway_0804esp" targetRef="Activity_0w1jswv" />
     <sequenceFlow id="Flow_1c31xot" sourceRef="Activity_0w1jswv" targetRef="Activity_01vkh7w" />
     <sequenceFlow id="Flow_07pxk40" sourceRef="Activity_01vkh7w" targetRef="Event_0n0xa8x" />
-    <sequenceFlow id="Flow_1sq7lpb" sourceRef="Gateway_0xd8ymp" targetRef="Gateway_03xdqde" />
     <sequenceFlow id="Flow_1cwfnec" sourceRef="Gateway_03xdqde" targetRef="Gateway_1cuzdty" />
     <sequenceFlow id="Flow_0qjddct" sourceRef="Gateway_03xdqde" targetRef="Activity_15dlxup" />
     <sequenceFlow id="Flow_11cx667" sourceRef="Activity_15dlxup" targetRef="Gateway_1cuzdty" />
-    <sequenceFlow id="Flow_18ividc" sourceRef="Task_1hcentk" targetRef="Gateway_0xd8ymp" />
+    <sequenceFlow id="Flow_18ividc" sourceRef="Task_1hcentk" targetRef="Gateway_03xdqde" />
     <sequenceFlow id="Flow_1ytqqcd" sourceRef="StartEvent_1y45yut" targetRef="Task_1hcentk" />
   </process>
   <bpmndi:BPMNDiagram id="BpmnDiagram_1">
@@ -153,9 +148,6 @@
       <bpmndi:BPMNShape id="Gateway_1cuzdty_di" bpmnElement="Gateway_1cuzdty" isMarkerVisible="true">
         <omgdc:Bounds x="585" y="155" width="50" height="50" />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="BPMNShape_0neipsg" bpmnElement="Gateway_0xd8ymp" isMarkerVisible="true">
-        <omgdc:Bounds x="235" y="155" width="50" height="50" />
-      </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_1hcentk_di" bpmnElement="Task_1hcentk">
         <omgdc:Bounds x="210" y="250" width="100" height="80" />
         <bpmndi:BPMNLabel />
@@ -163,7 +155,7 @@
       <bpmndi:BPMNShape id="StartEvent_1y45yut_di" bpmnElement="StartEvent_1y45yut">
         <omgdc:Bounds x="242" y="372" width="36" height="36" />
         <bpmndi:BPMNLabel>
-          <omgdc:Bounds x="224" y="418" width="71" height="27" />
+          <omgdc:Bounds x="223" y="418" width="73" height="27" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Activity_15dlxup_di" bpmnElement="Activity_15dlxup">
@@ -237,10 +229,6 @@
         <omgdi:waypoint x="640" y="510" />
         <omgdi:waypoint x="588" y="510" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_1sq7lpb_di" bpmnElement="Flow_1sq7lpb">
-        <omgdi:waypoint x="285" y="180" />
-        <omgdi:waypoint x="325" y="180" />
-      </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_1cwfnec_di" bpmnElement="Flow_1cwfnec">
         <omgdi:waypoint x="350" y="150" />
         <omgdi:waypoint x="350" y="90" />
@@ -259,7 +247,8 @@
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_18ividc_di" bpmnElement="Flow_18ividc">
         <omgdi:waypoint x="260" y="250" />
-        <omgdi:waypoint x="260" y="205" />
+        <omgdi:waypoint x="260" y="180" />
+        <omgdi:waypoint x="325" y="180" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_1ytqqcd_di" bpmnElement="Flow_1ytqqcd">
         <omgdi:waypoint x="260" y="372" />

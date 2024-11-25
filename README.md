@@ -30,3 +30,10 @@ The output from the extractor is the input for the script.
 
 1. Path to log folder as input_folder_path
 2. Name of the contract as input_contract_file_name
+
+## Usage
+
+To execute the main function of the project, run:
+```console
+python main.py
+```

@@ -53,6 +53,7 @@ def load_bpmn_petri(filename_without_extension):
 
 def alignments_calculations(ocel):
     """"
+    # Future work
      Using our own BPMN as reference model
      https://processintelligence.solutions/static/api/2.7.11/api.html#conformance-checking-pm4py-conformance
      # does not work with our log since they mostly have the same activity name: "call and transfer"
@@ -105,15 +106,6 @@ def plotting_tx(timestamps_unprofit, losses, profits_profitable_with_timestamp, 
     #Automatically Adjusting the X-Axis Limits
     #plt.xlim([min(timestamps_unprofit + timestamps_profit), max(timestamps_unprofit + timestamps_profit)])
 
-    # Set the x-axis limits manually
-    #plt.xlim(pd.Timestamp('2016-02-16'), pd.Timestamp('2016-08-16')) # ether_doubler_without_deployer has outlier in 2018
-    #plt.xlim(pd.Timestamp('2016-02-16'), pd.Timestamp('2016-04-16')) # ether doubler noch mehr weg gecuttet um so sehen
-    #plt.xlim(pd.Timestamp('2015-07-01'), pd.Timestamp('2016-07-01')) # ethereumpyrmadi has outlier in 
-    #plt.xlim(pd.Timestamp('2016-01-01'), pd.Timestamp('2016-07-01')) # dynaumpyrmadi has outlier in 
-    #plt.xlim(pd.Timestamp('2016-03-22'), pd.Timestamp('2016-03-29')) # piggy has outlier in 
-    
-    # Set the y-axis limits manually
-    #plt.ylim([-0.2e19, 0.8e19]) #y-axe limit because millionmoney has this one huge outlier with 18 eth
 
     # Format x-axis for better date readability
     plt.gcf().autofmt_xdate()
@@ -137,9 +129,8 @@ def plotting_tx(timestamps_unprofit, losses, profits_profitable_with_timestamp, 
 def input_output_flow(ocel, filename_without_extension, folder_path, node_url, likelihood_threshold):
     # Step 1: Extract relevant events and attributes
     events = ocel.events
-    objects = ocel.objects
     
-    # Step 2: 
+    # Step 2: Prepare the data
 
     # first row
     first_row = events.iloc[0]
@@ -184,7 +175,6 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     first_user.append(first_caller)
 
     print("first users",first_user)
-    #print(address_dict["0xfffc07f1b5f1d6bd365aa1dbc9d16b1777f406a2"])# if eoa or sc
 
     # get important timestamps of the events
     last_timestamp = events["ocel:timestamp"].max()
@@ -288,7 +278,8 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
                     counts[pathing_type]["first_user_triggers_to_pay_out"] += 1
                 
                 break  # Stop inner loop when the hash changes 
-
+            
+            ######here starts the inner loop checking
             # Process the transactions with the same hash with multiple tracePos
             ####print(f"Processing transaction with the same hash: {inner_row['hash']} in trace Pos: {inner_row['tracePos']}")
             if inner_row["callvalue"] > 0:
@@ -389,8 +380,8 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
                 
                 # this means its the initial investment of a user to the Dapp (user A initiates transaction)
                 # check if from_Typ is a contract or an EOA
-                if(row["from_Type"] == "EOA"): # so it cant be the Dapps first sending transaction
-                    user_order.append(user)
+                if (row["from_Type"] == "EOA"): # so it cant be the Dapps first sending transaction
+                    user_order.append(user) # for chain testing
                     ####print("Sender is a EOA: ", user)
                     #combined_df.loc[i+1, "concept:name"] = "user A initiates Transaction"-> idea to manipulate the events-> see branch
                     counts["count_initial_paths"]["initial_investment_to_Sc_by_EOA"] += 1
@@ -425,8 +416,7 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
                 if address_balance[user]["first_interaction_as_sender"] == None:
                     counts["count_zero_sending_paths"]["joins_without_investing"] += 1
                 
-                # add timestamp for first interaction as sender
-                if address_balance[user]["first_interaction_as_sender"] == None:
+                    # add timestamp for first interaction as sender
                     address_balance[user]["first_interaction_as_sender"] = timestamp # now he joined
                     ##print("First interaction of user: ", user)
                 
@@ -434,7 +424,7 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
                 counts["count_zero_sending_paths"]["sends_zero_to_SC"] += 1
 
                 # Does SC got triggered to send?
-                # if the SC sends to another user like in 0xa068bdda7b9f597e8a2eb874285ab6b864836cb8e48a1b6fccb0150bf44f5592 #coinbase ODER 0xa068bdda7b9f597e8a2eb874285ab6b864836cb8e48a1b6fccb0150bf44f5592 chicken
+                # if the SC sends to another user like in 0xa068bdda7b9f597e8a2eb874285ab6b864836cb8e48a1b6fccb0150bf44f5592 #coinbase or 0xa068bdda7b9f597e8a2eb874285ab6b864836cb8e48a1b6fccb0150bf44f5592 chicken
                 # same hash should have callvalue > 0 and from = SC and to = user
                 innerloop_for_same_tx_hash(i, events, row["hash"], "count_zero_sending_paths", previous_user_id)
                 #previous_user_id = user
@@ -447,8 +437,9 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
                 if events.iloc[i+1]["to"] == sc_input:
                     counts["hide_behind_own_SC_path"]["eoa_triggers_other_SC_to_interact"] += 1
                     innerloop_for_same_tx_hash(i, events, row["hash"], "hide_behind_own_SC_path", previous_user_id)# this values are not counted in the zero sending paths because its sending to another SC
+    #main loop ends here
 
-                
+    # print some stats           
     print("user order ", user_order_correct)
     # print initial_investment_to_Sc_by_EOA
     print(counts["count_initial_paths"])
@@ -462,6 +453,7 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     print(counts["hide_behind_own_SC_path"])
 
     print("first users after loop",first_user)
+
     # Step 4: Calculate the ratios
     ###Ratios
     
@@ -483,7 +475,6 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
         scam_signal["P_directly_send_to_others"] = "Orange"
 
     # Ratio of: all tx with ether send to the SC from EOA / all tx to the SC from EOA (also 0 value tx)
-    #TODO Should i add the zero path?
     ratio_tx_with_eth_and_all_tx = (counts["count_initial_paths"]["initial_investment_to_Sc_by_EOA"] + counts["counter_user_sends_again_paths"]["invests_again"]) / (counts["count_initial_paths"]["initial_investment_to_Sc_by_EOA"] + counts["counter_user_sends_again_paths"]["invests_again"] + counts["count_zero_sending_paths"]["sends_zero_to_SC"])
     print("ratio_tx_with_eth_and_all_tx", ratio_tx_with_eth_and_all_tx)
     # if this is 1 it means that all transactions to the SC are with value -> sound like a Ponzi
@@ -586,7 +577,7 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
             print("Chain detection is lower than 20% and therefore the contact is likely a linear shaped Ponzi scheme")
             scam_signal["is_chain_shaped"] = "Green"
 
-    #TODO here are all addresess before getting kicked because they have no value transactions
+    # here are all addresess before getting kicked because they have no value transactions
     howmany = 0
     for address in address_balance:
         howmany += 1
@@ -675,7 +666,7 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
     
     
 
-    # Addition: Wie oft welche Summe vorkommt
+    # Addition: how often the same amount is invested
     # check if users invest the same in most cases
     # check with which frequency the users invest the same amount of ether
    
@@ -807,7 +798,6 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
 
     #R4
     # Probability of losing money grows with the time of joining the scheme later
-    # bubble chart? scatter plot?
     unprofitable_users = [address for address in user_profits if user_profits[address] < 0]
     even_profit_users = [address for address in user_profits if user_profits[address] == 0]
     
@@ -1020,22 +1010,7 @@ def input_output_flow(ocel, filename_without_extension, folder_path, node_url, l
 
 def check_ponzi_criteria(ocel, filename_without_extension, folder_path, node_url, likelihood_threshold):
     print("Start checking Ponzi criteria:")
-    # firstly check the ponzi if he is a contract or an EOA: extractor gives just trace tree output, when trying to extract a EOA address without creation
-
-    """
-    It's important to note that while events_df is a Pandas DataFrame, it's a view into the OCEL data structure. 
-    If you modify this DataFrame, you may need to update the OCEL object to reflect these changes, depending on what operations you're performing
-    events_df = ocel.events #ocel.events returns a Pandas DataFrame
-    #print(ocel.objects)
-    """
-
-    input_output_flow(ocel, filename_without_extension, folder_path, node_url, likelihood_threshold)
+    input_output_flow(ocel, filename_without_extension, folder_path, node_url, likelihood_threshold) #own method
     #alignments_calculations(ocel)
 
-  
-
-    """
-    Updating OCEL:
-    After manipulating the DataFrame, how to update the OCEL object to reflect these changes?
-    """
     return

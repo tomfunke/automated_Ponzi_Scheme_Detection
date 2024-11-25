@@ -8,7 +8,7 @@ def open_contracts_txt_file(folder_path, contract_file_name):
     contracts_file_path = os.path.join(folder_path,'contracts_dapp_' + contract_file_name+'.txt')
     if not os.path.isfile(contracts_file_path):
         print("The contract_txt file does not exist.")
-        return None # falls die Datei nicht wichtiger wird. sonst sys.exit(1)
+        return None 
     
     with open(contracts_file_path, 'r') as file:
         contracts = file.read().splitlines()

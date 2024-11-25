@@ -13,14 +13,9 @@ def pn_and_dfg_discovery(ocel, filename_without_extension):
     Transforms the current OCEL data structure into a Pandas dataframe containing the events with their attributes and the related objects per object type."
      https://pm4py.fit.fraunhofer.de/static/assets/api/2.7.11/pm4py.objects.ocel.html#pm4py.objects.ocel.obj.OCEL.get_extended_table
     """
-    #df_ocel = ocel.get_extended_table()
-    #print(df_ocel)
     
     #Print some basic statisctics on ocels
     print(ocel)
-    #print(pm4py.ocel_get_object_types(ocel))
-    #print(pm4py.ocel_object_type_activities(ocel))
-    #print(pm4py.ocel_objects_summary(ocel)) # life cycle of the objects
     print(pm4py.ocel_objects_summary(ocel))
     
     
